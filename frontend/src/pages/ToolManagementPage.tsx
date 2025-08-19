@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Typography, Box, CircularProgress, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, 
-  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert, MenuItem, InputAdornment, FormControlLabel, Checkbox
+  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert, MenuItem, InputAdornment, FormControlLabel, Checkbox, TablePagination
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, InfoOutlined as InfoOutlinedIcon } from '@mui/icons-material';
 import api from '../services/api';
@@ -22,6 +22,35 @@ interface Tool {
   outputSchemaJson?: string;
 }
 
+interface ApiResponseData {
+  content: Tool[];
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+    sort: {
+      empty: boolean;
+      sorted: boolean;
+      unsorted: boolean;
+    };
+    offset: number;
+    paged: boolean;
+    unpaged: boolean;
+  };
+  last: boolean;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  size: number;
+  number: number;
+  sort: {
+    empty: boolean;
+    sorted: boolean;
+    unsorted: boolean;
+  };
+  numberOfElements: number;
+  empty: boolean;
+}
+
 interface Parameter {
   id: string; // Unique ID for React key
   name: string;
@@ -38,6 +67,11 @@ const ToolManagementPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
   const [currentTool, setCurrentTool] = useState<Tool | null>(null);
+  
+  // Pagination states
+  const [page, setPage] = useState(0); // 0-indexed page number
+  const [rowsPerPage, setRowsPerPage] = useState(10); // Items per page
+  const [totalElements, setTotalElements] = useState(0);
   
   const [name, setName] = useState('');
   const [type, setType] = useState<'HTTP' | 'GROOVY'>('HTTP');
@@ -228,12 +262,14 @@ const ToolManagementPage: React.FC = () => {
     }
   };
 
-  const fetchTools = async () => {
+  const fetchTools = async (pageNumber: number, pageSize: number) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<Tool[]>('/mcp/tools');
-      setTools(response);
+      const response = await api.get<ApiResponseData>(`/mcp/tools?page=${pageNumber}&size=${pageSize}`);
+      setTools(response.content);
+      setTotalElements(response.totalElements);
+      setPage(response.number); // Update page state based on actual response page number
     } catch (err: unknown) {
       setError((err as Error).message || 'Failed to fetch tools.');
       console.error('Fetch tools error:', err);
@@ -243,8 +279,8 @@ const ToolManagementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchTools();
-  }, []);
+    fetchTools(page, rowsPerPage);
+  }, [page, rowsPerPage]);
 
   const handleOpenDialog = (tool: Tool | null = null) => {
     setCurrentTool(tool);
@@ -359,7 +395,8 @@ const ToolManagementPage: React.FC = () => {
         // Create tool
         await api.post('/mcp/tools', toolData);
       }
-      fetchTools();
+      setPage(0); // Reset to first page after add/update
+      fetchTools(0, rowsPerPage);
       handleCloseDialog();
     } catch (err: unknown) {
       setDialogError((err as Error).message || 'Operation failed.');
@@ -371,7 +408,8 @@ const ToolManagementPage: React.FC = () => {
     if (window.confirm('Are you sure you want to delete this tool?')) {
       try {
         await api.delete(`/mcp/tools/${id}`);
-        fetchTools();
+        setPage(0); // Reset to first page after delete
+        fetchTools(0, rowsPerPage);
       } catch (err: unknown) {
         setError((err as Error).message || 'Failed to delete tool.');
         console.error('Delete tool error:', err);
@@ -446,6 +484,18 @@ const ToolManagementPage: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25]}
+        component="div"
+        count={totalElements}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={(event, newPage) => setPage(newPage)}
+        onRowsPerPageChange={(event) => {
+          setRowsPerPage(parseInt(event.target.value, 10));
+          setPage(0); // Reset to first page when rows per page changes
+        }}
+      />
 
       <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="md">
         <DialogTitle>{currentTool ? 'Edit Tool' : 'Add Tool'}</DialogTitle>

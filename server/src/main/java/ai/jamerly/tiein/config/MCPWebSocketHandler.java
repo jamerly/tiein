@@ -20,6 +20,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -219,11 +221,13 @@ public class MCPWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void handleToolsList(WebSocketSession session, JsonNode idNode, JsonNode paramsNode) throws IOException {
-        try {
-            List<MCPTool> mcpTools = mcpToolService.getAllTools();
-            ArrayNode toolsArray = objectMapper.createArrayNode();
-
-            for (MCPTool mcpTool : mcpTools) {
+        ArrayNode toolsArray = objectMapper.createArrayNode();
+        Integer page = 1;
+        while(Boolean.TRUE){
+            Page<MCPTool> mcpTools = mcpToolService.getAllTools(
+                    PageRequest.of(page++,100)
+            );
+            for (MCPTool mcpTool : mcpTools.getContent()) {
                 ToolDto toolDto = new ToolDto();
                 toolDto.setName(mcpTool.getName());
                 toolDto.setDescription(mcpTool.getDescription());
@@ -237,12 +241,11 @@ public class MCPWebSocketHandler extends TextWebSocketHandler {
 
                 toolsArray.add(objectMapper.valueToTree(toolDto));
             }
-
-            ObjectNode result = objectMapper.createObjectNode();
-            result.set("tools", toolsArray);
-
+        }
+        ObjectNode result = objectMapper.createObjectNode();
+        result.set("tools", toolsArray);
+        try {
             sendResponse(session, idNode, result);
-
         } catch (Exception e) {
             sendError(session, idNode, -32000, "Error listing tools: " + e.getMessage());
         }

@@ -1,6 +1,7 @@
 package ai.jamerly.tiein.controller;
 
 import ai.jamerly.tiein.dto.ApiResponse;
+import ai.jamerly.tiein.dto.PageerDto;
 import ai.jamerly.tiein.entity.MCPTool;
 import ai.jamerly.tiein.entity.SystemSetting;
 import ai.jamerly.tiein.repository.UserRepository;
@@ -8,11 +9,14 @@ import ai.jamerly.tiein.service.MCPToolService;
 import ai.jamerly.tiein.service.SystemSettingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.util.HashMap;
 import java.util.List;
@@ -72,8 +76,18 @@ public class MCPServerController {
     }
 
     @GetMapping("/tools/all")
-    public ResponseEntity<ApiResponse<List<MCPTool>>> getAllTools() {
-        return ResponseEntity.ok(ApiResponse.success(mcpToolService.getAllTools()));
+    public ResponseEntity<ApiResponse<Page<MCPTool>>> getAllTools(@RequestParam PageerDto pageerDto) {
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        mcpToolService.getAllTools(
+                                PageRequest.of(
+                                        pageerDto.getPage(),
+                                        pageerDto.getPageSize(),
+                                        Sort.by("id").descending()
+                                )
+                        )
+                )
+        );
     }
 
     @GetMapping("/settings/all")
