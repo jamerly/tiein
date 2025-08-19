@@ -2,6 +2,7 @@ package ai.jamerly.tiein.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.util.UUID; // Import UUID for token generation
 
 @Data
 @Entity
@@ -14,4 +15,12 @@ public class User {
     private String username;
     private String password;
     private String role; // e.g., "ADMIN", "USER"
+
+    @Column(unique = true) // Ensure permanentToken is unique
+    private String permanentToken;
+
+    // Method to generate a new permanent token
+    public void generateNewPermanentToken() {
+        this.permanentToken = UUID.randomUUID().toString().replace("-", ""); // Simple UUID-based token
+    }
 }

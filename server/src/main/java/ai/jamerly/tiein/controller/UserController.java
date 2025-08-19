@@ -6,6 +6,7 @@ import ai.jamerly.tiein.dto.ApiResponse;
 import ai.jamerly.tiein.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -88,5 +89,35 @@ public class UserController {
     public ResponseEntity<ApiResponse<String>> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
         return ResponseEntity.ok(ApiResponse.success("User deleted successfully"));
+    }
+
+    @GetMapping("/permanent-token")
+    public ResponseEntity<ApiResponse<String>> getPermanentToken() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        String token = userService.getPermanentTokenForUser(username);
+        if (token != null) {
+            return ResponseEntity.ok(ApiResponse.success(token));
+        } else {
+            return ResponseEntity.status(404).body(ApiResponse.error(404, "Permanent token not found for user."));
+        }
+    }
+
+    @PostMapping("/generate-permanent-token")
+    public ResponseEntity<ApiResponse<String>> generatePermanentToken() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        String newToken = userService.generateNewPermanentTokenForUser(username);
+        if (newToken != null) {
+            return ResponseEntity.ok(ApiResponse.success(newToken));
+        } else {
+            return ResponseEntity.status(500).body(ApiResponse.error(500, "Failed to generate new permanent token."));
+        }
+    }
+
+    @GetMapping("/profile")
+    public ResponseEntity<ApiResponse<ai.jamerly.tiein.entity.User>> getUserProfile() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userService.findByUsername(username)
+                .map(user -> ResponseEntity.ok(ApiResponse.success(user)))
+                .orElse(ResponseEntity.status(404).body(ApiResponse.error(404, "User profile not found.")));
     }
 }

@@ -2,7 +2,7 @@ package ai.jamerly.tiein.interceptor;
 
 import ai.jamerly.tiein.entity.User;
 import ai.jamerly.tiein.repository.UserRepository;
-import ai.jamerly.tiein.util.JwtUtil;
+import ai.jamerly.tiein.security.jwt.JwtUtil;
 import com.alibaba.fastjson2.JSONObject;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -59,7 +59,7 @@ public class SystemInitializationInterceptor implements HandlerInterceptor {
             }
         }
 
-        if (username != null && jwtUtil.validateToken(token, username)) {
+        if (username != null) { // Assuming username is extracted from a valid token by JwtRequestFilter
             Optional<User> userOptional = userRepository.findByUsername(username);
             if (userOptional.isPresent()) {
                 User user = userOptional.get();

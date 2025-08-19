@@ -108,10 +108,7 @@ const UserManagementPage: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        User Management
-      </Typography>
+    <Box sx={{}}>
       <Button 
         variant="contained" 
         startIcon={<AddIcon />} 

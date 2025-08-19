@@ -8,6 +8,7 @@ import ToolManagementPage from './pages/ToolManagementPage';
 import ResourceManagementPage from './pages/ResourceManagementPage';
 import PromptManagementPage from './pages/PromptManagementPage';
 import SystemSettingsPage from './pages/SystemSettingsPage';
+import UserSettingPage from './pages/UserSettingPage';
 import RegisterPage from './pages/RegisterPage';
 import Layout from './components/Layout';
 import api from './services/api';
@@ -80,6 +81,7 @@ const App: React.FC = () => {
                   <Route path="/resources" element={<ResourceManagementPage />} />
                   <Route path="/prompts" element={<PromptManagementPage />} />
                   <Route path="/settings" element={<SystemSettingsPage />} />
+                  <Route path="/profile" element={<UserSettingPage />} />
                   {/* Fallback for any other unmatched path within authenticated area */}
                   <Route path="*" element={<Navigate to="/dashboard" />} />
                 </Routes>

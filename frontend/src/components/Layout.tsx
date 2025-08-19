@@ -1,5 +1,6 @@
+import React, { useState } from 'react';
 import type { ReactNode } from 'react';
-import { AppBar, Toolbar, Typography, Button, Box, List, ListItem, ListItemText, CssBaseline } from '@mui/material';
+import { AppBar, Toolbar, Typography, Button, Box, List, ListItem, ListItemText, CssBaseline, Menu, MenuItem } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -9,8 +10,19 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth(); // Get user from useAuth
   const location = useLocation();
+
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const open = Boolean(anchorEl);
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
 
   const handleLogout = () => {
     logout();
@@ -22,8 +34,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { text: 'Tools', path: '/tools' },
     { text: 'Resources', path: '/resources' },
     { text: 'Prompts', path: '/prompts' },
-    { text: 'Users', path: '/users' },
-    { text: 'System Settings', path: '/settings' },
   ];
 
   return (
@@ -55,9 +65,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Button>
             ))}
           </Box>
-          <Button color="inherit" onClick={handleLogout}>
-            Logout
+          <Button
+            color="inherit"
+            onClick={handleMenuOpen}
+            sx={{ textTransform: 'none' }} // Prevent uppercase
+          >
+            {user?.username || 'Guest'}
           </Button>
+          <Menu
+            anchorEl={anchorEl}
+            open={open}
+            onClose={handleMenuClose}
+            MenuListProps={{
+              'aria-labelledby': 'basic-button',
+            }}
+          >
+            <MenuItem onClick={() => { navigate('/profile'); handleMenuClose(); }}>User Profile</MenuItem>
+            <MenuItem onClick={() => { navigate('/settings'); handleMenuClose(); }}>System Settings</MenuItem>
+            <MenuItem onClick={handleLogout}>Logout</MenuItem>
+          </Menu>
         </Toolbar>
       </AppBar>
       <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}> {/* mt for AppBar height */}

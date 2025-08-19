@@ -14,7 +14,8 @@ import ai.jamerly.tiein.service.CompletionService;
 import ai.jamerly.tiein.service.MCPPromptService;
 import ai.jamerly.tiein.service.MCPResourceService;
 import ai.jamerly.tiein.service.MCPToolService;
-import ai.jamerly.tiein.util.JwtUtil;
+import ai.jamerly.tiein.service.UserService; // Import UserService
+import ai.jamerly.tiein.security.jwt.JwtUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -22,6 +23,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -44,6 +47,9 @@ public class MCPWebSocketHandler extends TextWebSocketHandler {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private UserService userService; // Autowire UserService
 
     @Autowired
     private MCPToolService mcpToolService;
@@ -76,14 +82,29 @@ public class MCPWebSocketHandler extends TextWebSocketHandler {
 
         try {
             String username = jwtUtil.extractUsername(token);
-            if (username == null || !jwtUtil.validateToken(token, username)) {
+            if (username == null) { // Check if username can be extracted
+                session.close(new CloseStatus(CloseStatus.POLICY_VIOLATION.getCode(), "Invalid token: Username not found."));
+                return;
+            }
+
+            // Load UserDetails to validate the token
+            UserDetails userDetails = null;
+            try {
+                userDetails = userService.loadUserByUsername(username);
+            } catch (UsernameNotFoundException e) {
+                session.close(new CloseStatus(CloseStatus.POLICY_VIOLATION.getCode(), "User not found."));
+                return;
+            }
+
+            if (!jwtUtil.validateToken(token, userDetails)) { // Use userDetails for validation
                 session.close(new CloseStatus(CloseStatus.POLICY_VIOLATION.getCode(), "Invalid or expired token."));
                 return;
             }
 
+            // User is authenticated, proceed to set session attributes
             Optional<User> userOptional = userRepository.findByUsername(username);
-            if (userOptional.isEmpty()) {
-                session.close(new CloseStatus(CloseStatus.POLICY_VIOLATION.getCode(), "User not found."));
+            if (userOptional.isEmpty()) { // This should ideally not happen if loadUserByUsername succeeded
+                session.close(new CloseStatus(CloseStatus.POLICY_VIOLATION.getCode(), "User not found after validation."));
                 return;
             }
 

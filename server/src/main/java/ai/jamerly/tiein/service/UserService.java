@@ -2,15 +2,19 @@ package ai.jamerly.tiein.service;
 
 import ai.jamerly.tiein.entity.User;
 import ai.jamerly.tiein.repository.UserRepository;
-import ai.jamerly.tiein.util.JwtUtil;
+import ai.jamerly.tiein.security.jwt.JwtUtil; // Use the new JwtUtil
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Optional;
 
 @Service
-public class UserService {
+public class UserService implements UserDetailsService {
 
     @Autowired
     private UserRepository userRepository;
@@ -23,6 +27,19 @@ public class UserService {
 
     @Autowired
     private SystemSettingService systemSettingService;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
+        return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), new ArrayList<>());
+    }
+
+    public UserDetails loadUserByPermanentToken(String permanentToken) throws UsernameNotFoundException {
+        User user = userRepository.findByPermanentToken(permanentToken)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with permanent token."));
+        return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), new ArrayList<>());
+    }
 
     public String login(String username, String password) {
         Optional<User> userOptional = userRepository.findByUsername(username);
@@ -48,7 +65,6 @@ public class UserService {
         return false; // Password change failed
     }
 
-    
     public User register(String username, String password) {
         if (!systemSettingService.isRegistrationOpen()) {
             return null; // Registration is closed
@@ -65,8 +81,24 @@ public class UserService {
         } else {
             newUser.setRole("USER");
         }
-
+        newUser.generateNewPermanentToken(); // Generate permanent token for new user
         return userRepository.save(newUser);
+    }
+
+    public String getPermanentTokenForUser(String username) {
+        return userRepository.findByUsername(username)
+                .map(User::getPermanentToken)
+                .orElse(null);
+    }
+
+    public String generateNewPermanentTokenForUser(String username) {
+        return userRepository.findByUsername(username)
+                .map(user -> {
+                    user.generateNewPermanentToken();
+                    userRepository.save(user);
+                    return user.getPermanentToken();
+                })
+                .orElse(null);
     }
 
     public long countUsers() {
@@ -83,6 +115,7 @@ public class UserService {
 
     public User createUser(User user) {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
+        user.generateNewPermanentToken(); // Generate permanent token for manually created user
         return userRepository.save(user);
     }
 
@@ -94,11 +127,16 @@ public class UserService {
                         user.setPassword(passwordEncoder.encode(updatedUser.getPassword()));
                     }
                     user.setRole(updatedUser.getRole());
+                    // Do not update permanent token here unless explicitly requested
                     return userRepository.save(user);
                 }).orElse(null);
     }
 
     public void deleteUser(Long id) {
         userRepository.deleteById(id);
+    }
+
+    public Optional<User> findByUsername(String username) {
+        return userRepository.findByUsername(username);
     }
 }

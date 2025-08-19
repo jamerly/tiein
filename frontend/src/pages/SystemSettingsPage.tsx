@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Box, CircularProgress, Switch, FormControlLabel, Alert, Button } from '@mui/material';
+import { Typography, Box, CircularProgress, Switch, FormControlLabel, Alert, Button, Card, CardContent, Grid, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
+import { Settings as SettingsIcon, People as PeopleIcon } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import UserManagementPage from './UserManagementPage'; // Import UserManagementPage
 
 const SystemSettingsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState<boolean | null>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [selectedMenuItem, setSelectedMenuItem] = useState('general'); // Default to general settings
+
+  const menuItemsData = [
+    { id: 'general', text: 'General Settings', icon: <SettingsIcon /> },
+    { id: 'users', text: 'User Management', icon: <PeopleIcon /> },
+  ];
 
   const fetchRegistrationStatus = async () => {
     try {
@@ -64,24 +74,55 @@ const SystemSettingsPage: React.FC = () => {
         System Settings
       </Typography>
 
-      <Box sx={{ mt: 3 }}>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={isRegistrationOpen !== null ? isRegistrationOpen : false}
-              onChange={handleToggleRegistration}
-              name="registrationStatus"
-              color="primary"
-            />
-          }
-          label="Allow New User Registration"
-        />
-        {updateStatus && (
-          <Alert severity={updateStatus.includes('successfully') ? 'success' : 'error'} sx={{ mt: 2 }}>
-            {updateStatus}
-          </Alert>
-        )}
-      </Box>
+      <Grid container spacing={3} sx={{ height: 'calc(100vh - 120px)' }}> {/* Adjust height based on AppBar and padding */}
+        {/* Left Column: Navigation Menu */}
+        <Grid item xs={12} md={3} sx={{ height: '100%' }}>
+          <List component="nav" sx={{ height: '100%', borderRight: '1px solid #e0e0e0' }}>
+            {menuItemsData.map((item) => (
+              <ListItem key={item.id} disablePadding>
+                <ListItemButton
+                  selected={selectedMenuItem === item.id}
+                  onClick={() => setSelectedMenuItem(item.id)}
+                >
+                  <ListItemIcon>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.text} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Grid>
+
+        {/* Right Column: Content Area */}
+        <Grid item xs={12} md={9}>
+          {selectedMenuItem === 'general' && (
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>General Settings</Typography>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={isRegistrationOpen !== null ? isRegistrationOpen : false}
+                      onChange={handleToggleRegistration}
+                      name="registrationStatus"
+                      color="primary"
+                    />
+                  }
+                  label="Allow New User Registration"
+                />
+                {updateStatus && (
+                  <Alert severity={updateStatus.includes('successfully') ? 'success' : 'error'} sx={{ mt: 2 }}>
+                    {updateStatus}
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {selectedMenuItem === 'users' && (
+            <UserManagementPage />
+          )}
+        </Grid>
+      </Grid>
     </Box>
   );
 };
