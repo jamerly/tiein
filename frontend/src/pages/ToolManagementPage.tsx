@@ -1,0 +1,857 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Typography, Box, CircularProgress, 
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, 
+  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert, MenuItem, InputAdornment, FormControlLabel, Checkbox
+} from '@mui/material';
+import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, InfoOutlined as InfoOutlinedIcon } from '@mui/icons-material';
+import api from '../services/api';
+import { v4 as uuidv4 } from 'uuid';
+
+interface Tool {
+  id: number;
+  name: string;
+  type: 'HTTP' | 'GROOVY';
+  httpMethod?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  httpUrl?: string;
+  httpHeaders?: string;
+  httpBody?: string;
+  groovyScript?: string;
+  description?: string;
+  inputSchemaJson?: string;
+  outputSchemaJson?: string;
+}
+
+interface Parameter {
+  id: string; // Unique ID for React key
+  name: string;
+  type: 'string' | 'integer' | 'boolean' | 'array' | 'object';
+  description: string;
+  required: boolean;
+  defaultValue?: string | number | boolean;
+  enum?: string; // Stored as comma-separated string for simplicity in TextField
+}
+
+const ToolManagementPage: React.FC = () => {
+  const [tools, setTools] = useState<Tool[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [currentTool, setCurrentTool] = useState<Tool | null>(null);
+  
+  const [name, setName] = useState('');
+  const [type, setType] = useState<'HTTP' | 'GROOVY'>('HTTP');
+  const [httpMethod, setHttpMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('GET');
+  const [httpUrl, setHttpUrl] = useState('');
+  const [httpHeadersKv, setHttpHeadersKv] = useState<Array<{ key: string; value: string }>>([]);
+  const [httpBody, setHttpBody] = useState('');
+  const [groovyScript, setGroovyScript] = useState('');
+  const [description, setDescription] = useState('');
+  const [inputParameters, setInputParameters] = useState<Parameter[]>([]);
+  const [outputParameters, setOutputParameters] = useState<Parameter[]>([]);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+
+  const [inputSchemaMode, setInputSchemaMode] = useState<'form' | 'json'>('form');
+  const [outputSchemaMode, setOutputSchemaMode] = useState<'form' | 'json'>('form');
+  const [inputSchemaJsonRaw, setInputSchemaJsonRaw] = useState('');
+  const [outputSchemaJsonRaw, setOutputSchemaJsonRaw] = useState('');
+
+  const [openHelpDialog, setOpenHelpDialog] = useState(false);
+  const [helpDialogTitle, setHelpDialogTitle] = useState('');
+  const [helpDialogContent, setHelpDialogContent] = useState('');
+
+  // Helper to convert JSON Schema to Parameter[]
+  const jsonSchemaToParameters = (schemaJson?: string): Parameter[] => {
+    if (!schemaJson) return [{ id: uuidv4(), name: '', type: 'string', description: '', required: false, enum: '' }];
+    try {
+      const schema = JSON.parse(schemaJson);
+      if (schema.type !== 'object' || !schema.properties) {
+        console.warn("Schema is not a valid object schema:", schema);
+        return [{ id: uuidv4(), name: '', type: 'string', description: '', required: false, enum: '' }];
+      }
+      const parameters: Parameter[] = [];
+      const required = new Set(schema.required || []);
+
+      for (const key in schema.properties) {
+        const prop = schema.properties[key];
+        parameters.push({
+          id: uuidv4(),
+          name: key,
+          type: prop.type || 'string',
+          description: prop.description || '',
+          required: required.has(key),
+          defaultValue: prop.default !== undefined ? String(prop.default) : undefined,
+          enum: prop.enum ? prop.enum.join(', ') : undefined,
+        });
+      }
+      return parameters.length > 0 ? parameters : [{ id: uuidv4(), name: '', type: 'string', description: '', required: false, enum: '' }];
+    } catch (e) {
+      console.error("Failed to parse JSON schema:", e);
+      return [{ id: uuidv4(), name: '', type: 'string', description: '', required: false, enum: '' }];
+    }
+  };
+
+  // Helper to convert Parameter[] to JSON Schema
+  const parametersToJsonSchema = (parameters: Parameter[]): string | undefined => {
+    const properties: { [key: string]: any } = {};
+    const required: string[] = [];
+
+    parameters.forEach(param => {
+      if (param.name.trim() === '') return; // Skip empty parameter names
+
+      properties[param.name] = {
+        type: param.type,
+        description: param.description,
+      };
+      if (param.defaultValue !== undefined && param.defaultValue !== '') {
+        // Attempt to parse default value based on type
+        let parsedDefault: any = param.defaultValue;
+        if (param.type === 'integer') parsedDefault = parseInt(String(param.defaultValue));
+        else if (param.type === 'boolean') parsedDefault = (String(param.defaultValue).toLowerCase() === 'true');
+        // Add more type handling if needed
+        properties[param.name].default = parsedDefault;
+      }
+      if (param.enum && param.enum.trim() !== '') {
+        properties[param.name].enum = param.enum.split(',').map(s => s.trim());
+      }
+      if (param.required) {
+        required.push(param.name);
+      }
+    });
+
+    if (Object.keys(properties).length === 0) {
+      return undefined; // No parameters, return undefined schema
+    }
+
+    const schema = {
+      type: 'object',
+      properties: properties,
+      required: required,
+    };
+    return JSON.stringify(schema, null, 2);
+  };
+
+  const handleOpenHelpDialog = (title: string, content: string) => {
+    setHelpDialogTitle(title);
+    setHelpDialogContent(content);
+    setOpenHelpDialog(true);
+  };
+
+  const handleCloseHelpDialog = () => {
+    setOpenHelpDialog(false);
+    setHelpDialogTitle('');
+    setHelpDialogContent('');
+  };
+
+  const handleHeaderChange = (index: number, field: 'key' | 'value', value: string) => {
+    const newHeaders = [...httpHeadersKv];
+    newHeaders[index][field] = value;
+    setHttpHeadersKv(newHeaders);
+  };
+
+  const handleAddHeader = () => {
+    setHttpHeadersKv([...httpHeadersKv, { key: '', value: '' }]);
+  };
+
+  const handleRemoveHeader = (index: number) => {
+    const newHeaders = [...httpHeadersKv];
+    newHeaders.splice(index, 1);
+    setHttpHeadersKv(newHeaders);
+  };
+
+  const handleParameterChange = (index: number, updatedParam: Parameter, schemaType: 'input' | 'output') => {
+    if (schemaType === 'input') {
+      const newParams = [...inputParameters];
+      newParams[index] = updatedParam;
+      setInputParameters(newParams);
+    } else {
+      const newParams = [...outputParameters];
+      newParams[index] = updatedParam;
+      setOutputParameters(newParams);
+    }
+  };
+
+  const handleAddParameter = (schemaType: 'input' | 'output') => {
+    const newParam: Parameter = { id: uuidv4(), name: '', type: 'string', description: '', required: false, enum: '' };
+    if (schemaType === 'input') {
+      setInputParameters([...inputParameters, newParam]);
+    } else {
+      setOutputParameters([...outputParameters, newParam]);
+    }
+  };
+
+  const handleRemoveParameter = (index: number, schemaType: 'input' | 'output') => {
+    if (schemaType === 'input') {
+      const newParams = [...inputParameters];
+      newParams.splice(index, 1);
+      setInputParameters(newParams);
+    } else {
+      const newParams = [...outputParameters];
+      newParams.splice(index, 1);
+      setOutputParameters(newParams);
+    }
+  };
+
+  const handleToggleSchemaMode = (schemaType: 'input' | 'output') => {
+    if (schemaType === 'input') {
+      if (inputSchemaMode === 'form') {
+        // Switching to JSON mode: convert current parameters to JSON
+        const json = parametersToJsonSchema(inputParameters);
+        setInputSchemaJsonRaw(json || '');
+        setInputSchemaMode('json');
+      } else {
+        // Switching to Form mode: convert current JSON to parameters
+        try {
+          const params = jsonSchemaToParameters(inputSchemaJsonRaw);
+          setInputParameters(params);
+          setInputSchemaMode('form');
+        } catch (e) {
+          setDialogError('Invalid JSON. Cannot switch to form mode.');
+        }
+      }
+    } else {
+      if (outputSchemaMode === 'form') {
+        // Switching to JSON mode: convert current parameters to JSON
+        const json = parametersToJsonSchema(outputParameters);
+        setOutputSchemaJsonRaw(json || '');
+        setOutputSchemaMode('json');
+      } else {
+        // Switching to Form mode: convert current JSON to parameters
+        try {
+          const params = jsonSchemaToParameters(outputSchemaJsonRaw);
+          setOutputParameters(params);
+          setOutputSchemaMode('form');
+        } catch (e) {
+          setDialogError('Invalid JSON. Cannot switch to form mode.');
+        }
+      }
+    }
+  };
+
+  const fetchTools = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await api.get<Tool[]>('/mcp/tools');
+      setTools(response);
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Failed to fetch tools.');
+      console.error('Fetch tools error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTools();
+  }, []);
+
+  const handleOpenDialog = (tool: Tool | null = null) => {
+    setCurrentTool(tool);
+    setName(tool ? tool.name : '');
+    setType(tool ? tool.type : 'HTTP');
+    setHttpMethod(tool && tool.httpMethod ? tool.httpMethod : 'GET');
+    setHttpUrl(tool && tool.httpUrl ? tool.httpUrl : '');
+    
+    // Initialize httpHeadersKv
+    if (tool && tool.httpHeaders) {
+      try {
+        const parsedHeaders = JSON.parse(tool.httpHeaders);
+        const kvHeaders = Object.entries(parsedHeaders).map(([key, value]) => ({ key, value: String(value) }));
+        setHttpHeadersKv(kvHeaders.length > 0 ? kvHeaders : [{ key: '', value: '' }]);
+      } catch (e) {
+        console.error("Failed to parse httpHeaders JSON:", e);
+        setHttpHeadersKv([{ key: '', value: '' }]);
+      }
+    } else {
+      setHttpHeadersKv([{ key: '', value: '' }]);
+    }
+
+    setHttpBody(tool && tool.httpBody ? tool.httpBody : '');
+    setGroovyScript(tool && tool.groovyScript ? tool.groovyScript : '');
+    setDescription(tool ? tool.description : '');
+    setInputParameters(jsonSchemaToParameters(tool?.inputSchemaJson));
+    setOutputParameters(jsonSchemaToParameters(tool?.outputSchemaJson));
+    setInputSchemaJsonRaw(tool?.inputSchemaJson || '');
+    setOutputSchemaJsonRaw(tool?.outputSchemaJson || '');
+    setInputSchemaMode('form'); // Default to form mode
+    setOutputSchemaMode('form'); // Default to form mode
+    setDialogError(null);
+    setOpenDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setCurrentTool(null);
+    setName('');
+    setType('HTTP');
+    setHttpMethod('GET');
+    setHttpUrl('');
+    setHttpHeadersKv([{ key: '', value: '' }]); // Clear httpHeadersKv
+    setHttpBody('');
+    setGroovyScript('');
+    setDescription('');
+    setInputParameters([{ id: uuidv4(), name: '', type: 'string', description: '', required: false, enum: '' }]);
+    setOutputParameters([{ id: uuidv4(), name: '', type: 'string', description: '', required: false, enum: '' }]);
+    setInputSchemaJsonRaw('');
+    setOutputSchemaJsonRaw('');
+    setInputSchemaMode('form');
+    setOutputSchemaMode('form');
+    setDialogError(null);
+  };
+
+  const handleSubmit = async () => {
+    setDialogError(null);
+    try {
+      // Determine final inputSchemaJson and outputSchemaJson based on mode
+      let finalInputSchemaJson: string | undefined;
+      if (inputSchemaMode === 'form') {
+        finalInputSchemaJson = parametersToJsonSchema(inputParameters);
+      } else {
+        try {
+          // Validate raw JSON before submission
+          if (inputSchemaJsonRaw) JSON.parse(inputSchemaJsonRaw);
+          finalInputSchemaJson = inputSchemaJsonRaw || undefined;
+        } catch (e) {
+          setDialogError('Input Schema (JSON) is not valid JSON.');
+          return;
+        }
+      }
+
+      let finalOutputSchemaJson: string | undefined;
+      if (outputSchemaMode === 'form') {
+        finalOutputSchemaJson = parametersToJsonSchema(outputParameters);
+      } else {
+        try {
+          // Validate raw JSON before submission
+          if (outputSchemaJsonRaw) JSON.parse(outputSchemaJsonRaw);
+          finalOutputSchemaJson = outputSchemaJsonRaw || undefined;
+        } catch (e) {
+          setDialogError('Output Schema (JSON) is not valid JSON.');
+          return;
+        }
+      }
+
+      // Convert httpHeadersKv to JSON string
+      const headersObject = httpHeadersKv.reduce((acc, curr) => {
+        if (curr.key.trim() !== '') {
+          acc[curr.key] = curr.value;
+        }
+        return acc;
+      }, {} as Record<string, string>);
+      const finalHttpHeaders = Object.keys(headersObject).length > 0 ? JSON.stringify(headersObject) : undefined;
+
+      const toolData = {
+        name, type, description, 
+        inputSchemaJson: finalInputSchemaJson,
+        outputSchemaJson: finalOutputSchemaJson,
+        httpMethod: type === 'HTTP' ? httpMethod : undefined,
+        httpUrl: type === 'HTTP' ? httpUrl : undefined,
+        httpHeaders: type === 'HTTP' ? finalHttpHeaders : undefined,
+        httpBody: type === 'HTTP' ? httpBody : undefined,
+        groovyScript: type === 'GROOVY' ? groovyScript : undefined,
+      };
+
+      if (currentTool) {
+        // Update tool
+        await api.put(`/mcp/tools/${currentTool.id}`, { id: currentTool.id, ...toolData });
+      } else {
+        // Create tool
+        await api.post('/mcp/tools', toolData);
+      }
+      fetchTools();
+      handleCloseDialog();
+    } catch (err: unknown) {
+      setDialogError((err as Error).message || 'Operation failed.');
+      console.error('Tool operation error:', err);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (window.confirm('Are you sure you want to delete this tool?')) {
+      try {
+        await api.delete(`/mcp/tools/${id}`);
+        fetchTools();
+      } catch (err: unknown) {
+        setError((err as Error).message || 'Failed to delete tool.');
+        console.error('Delete tool error:', err);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <CircularProgress />
+        <Typography variant="h6" sx={{ ml: 2 }}>Loading Tools...</Typography>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h6" color="error">Error: {error}</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom>
+        Tool Management
+      </Typography>
+      <Button 
+        variant="contained" 
+        startIcon={<AddIcon />} 
+        onClick={() => handleOpenDialog()} 
+        sx={{ mb: 2 }}
+      >
+        Add Tool
+      </Button>
+      <TableContainer component={Paper}>
+        <Table sx={{ minWidth: 650, width: '100%' }} aria-label="tool table">
+          <TableHead>
+            <TableRow>
+              <TableCell>ID</TableCell>
+              <TableCell>Name</TableCell>
+              <TableCell>Type</TableCell>
+              <TableCell>Method</TableCell>
+              <TableCell>URL</TableCell>
+              <TableCell>Description</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {tools.map((tool) => (
+              <TableRow key={tool.id}>
+                <TableCell component="th" scope="row">
+                  {tool.id}
+                </TableCell>
+                <TableCell>{tool.name}</TableCell>
+                <TableCell>{tool.type}</TableCell>
+                <TableCell>{tool.httpMethod || 'N/A'}</TableCell>
+                <TableCell>{tool.httpUrl || 'N/A'}</TableCell>
+                <TableCell>{tool.description || 'N/A'}</TableCell>
+                <TableCell align="right">
+                  <IconButton aria-label="edit" onClick={() => handleOpenDialog(tool)}>
+                    <EditIcon />
+                  </IconButton>
+                  <IconButton aria-label="delete" onClick={() => handleDelete(tool.id)}>
+                    <DeleteIcon />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="md">
+        <DialogTitle>{currentTool ? 'Edit Tool' : 'Add Tool'}</DialogTitle>
+        <DialogContent>
+          {dialogError && <Alert severity="error" sx={{ mb: 2 }}>{dialogError}</Alert>}
+          <TextField
+            autoFocus
+            margin="dense"
+            id="name"
+            label="Name"
+            type="text"
+            fullWidth
+            variant="standard"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            margin="dense"
+            id="type"
+            label="Type"
+            select
+            fullWidth
+            variant="standard"
+            value={type}
+            onChange={(e) => setType(e.target.value as 'HTTP' | 'GROOVY')}
+            sx={{ mb: 2 }}
+          >
+            <MenuItem value="HTTP">HTTP</MenuItem>
+            <MenuItem value="GROOVY">GROOVY</MenuItem>
+          </TextField>
+
+          {type === 'HTTP' && (
+            <>
+              <TextField
+                margin="dense"
+                id="httpMethod"
+                label="HTTP Method"
+                select
+                fullWidth
+                variant="standard"
+                value={httpMethod}
+                onChange={(e) => setHttpMethod(e.target.value as 'GET' | 'POST' | 'PUT' | 'DELETE')}
+                sx={{ mb: 2 }}
+              >
+                <MenuItem value="GET">GET</MenuItem>
+                <MenuItem value="POST">POST</MenuItem>
+                <MenuItem value="PUT">PUT</MenuItem>
+                <MenuItem value="DELETE">DELETE</MenuItem>
+              </TextField>
+              <TextField
+                margin="dense"
+                id="httpUrl"
+                label="HTTP URL"
+                type="url"
+                fullWidth
+                variant="standard"
+                value={httpUrl}
+                onChange={(e) => setHttpUrl(e.target.value)}
+                sx={{ mb: 2 }}
+              />
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle1" gutterBottom>HTTP Headers (Key-Value)</Typography>
+                {httpHeadersKv.map((header, index) => (
+                  <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                    <TextField
+                      margin="dense"
+                      label="Key"
+                      variant="standard"
+                      value={header.key}
+                      onChange={(e) => handleHeaderChange(index, 'key', e.target.value)}
+                      sx={{ flex: 1 }}
+                    />
+                    <TextField
+                      margin="dense"
+                      label="Value"
+                      variant="standard"
+                      value={header.value}
+                      onChange={(e) => handleHeaderChange(index, 'value', e.target.value)}
+                      sx={{ flex: 1 }}
+                    />
+                    <IconButton onClick={() => handleRemoveHeader(index)} size="small">
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                ))}
+                <Button onClick={handleAddHeader} startIcon={<AddIcon />} size="small">
+                  Add Header
+                </Button>
+              </Box>
+              <TextField
+                margin="dense"
+                id="httpBody"
+                label="HTTP Body (JSON)"
+                type="text"
+                fullWidth
+                multiline
+                rows={4}
+                variant="standard"
+                value={httpBody}
+                onChange={(e) => setHttpBody(e.target.value)}
+                sx={{ mb: 2 }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => handleOpenHelpDialog(
+                          'HTTP Body Example',
+                          'Enter HTTP request body as a JSON object. Example:\n{\n  "param1": "value1",\n  "param2": 123\n}'
+                        )}
+                        edge="end"
+                      >
+                        <InfoOutlinedIcon />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </>
+          )}
+
+          {type === 'GROOVY' && (
+            <TextField
+              margin="dense"
+              id="groovyScript"
+              label="Groovy Script"
+              type="text"
+              fullWidth
+              multiline
+              rows={10}
+              variant="standard"
+              value={groovyScript}
+              onChange={(e) => setGroovyScript(e.target.value)}
+              sx={{ mb: 2 }}
+            />
+          )}
+
+          <TextField
+            margin="dense"
+            id="description"
+            label="Description"
+            type="text"
+            fullWidth
+            multiline
+            rows={3}
+            variant="standard"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Input Schema Parameters
+              <IconButton
+                onClick={() => handleOpenHelpDialog(
+                  'Input Schema Parameters Help',
+                  `Define the expected input parameters for the tool using JSON Schema. Each parameter has a name, type, description, and can be marked as required. You can also specify a default value or a list of allowed enum values for string types.
+
+Example JSON Schema for input parameters:
+{
+  "type": "object",
+  "properties": {
+    "city": {
+      "type": "string",
+      "description": "The city to get the weather for"
+    },
+    "unit": {
+      "type": "string",
+      "enum": ["celsius", "fahrenheit"],
+      "description": "The unit of temperature",
+      "default": "celsius"
+    }
+  },
+  "required": ["city"]
+}`
+                )}
+                size="small"
+              >
+                <InfoOutlinedIcon fontSize="small" />
+              </IconButton>
+              <Button onClick={() => handleToggleSchemaMode('input')} size="small" sx={{ ml: 1 }}>
+                {inputSchemaMode === 'form' ? 'Edit JSON' : 'Edit Form'}
+              </Button>
+            </Typography>
+            {inputSchemaMode === 'form' ? (
+              <>
+                {inputParameters.map((param, index) => (
+                  <ParameterRow
+                    key={param.id}
+                    parameter={param}
+                    onChange={(updatedParam) => handleParameterChange(index, updatedParam, 'input')}
+                    onRemove={() => handleRemoveParameter(index, 'input')}
+                  />
+                ))}
+                <Button onClick={() => handleAddParameter('input')} startIcon={<AddIcon />} size="small">
+                  Add Input Parameter
+                </Button>
+              </>
+            ) : (
+              <TextField
+                margin="dense"
+                id="inputSchemaJsonRaw"
+                label="Input Schema (JSON)"
+                type="text"
+                fullWidth
+                multiline
+                rows={10}
+                variant="standard"
+                value={inputSchemaJsonRaw}
+                onChange={(e) => setInputSchemaJsonRaw(e.target.value)}
+                sx={{ mb: 2 }}
+              />
+            )}
+          </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Output Schema Parameters
+              <IconButton
+                onClick={() => handleOpenHelpDialog(
+                  'Output Schema Parameters Help',
+                  `Define the expected output structure of the tool using JSON Schema. Each parameter has a name, type, and description.
+
+Example JSON Schema for output parameters:
+{
+  "type": "object",
+  "properties": {
+    "temperature": {
+      "type": "integer",
+      "description": "The current temperature"
+    },
+    "unit": {
+      "type": "string",
+      "description": "The unit of temperature"
+    }
+  }
+}`
+                )}
+                size="small"
+              >
+                <InfoOutlinedIcon fontSize="small" />
+              </IconButton>
+              <Button onClick={() => handleToggleSchemaMode('output')} size="small" sx={{ ml: 1 }}>
+                {outputSchemaMode === 'form' ? 'Edit JSON' : 'Edit Form'}
+              </Button>
+            </Typography>
+            {outputSchemaMode === 'form' ? (
+              <>
+                {outputParameters.map((param, index) => (
+                  <ParameterRow
+                    key={param.id}
+                    parameter={param}
+                    onChange={(updatedParam) => handleParameterChange(index, updatedParam, 'output')}
+                    onRemove={() => handleRemoveParameter(index, 'output')}
+                  />
+                ))}
+                <Button onClick={() => handleAddParameter('output')} startIcon={<AddIcon />} size="small">
+                  Add Output Parameter
+                </Button>
+              </>
+            ) : (
+              <TextField
+                margin="dense"
+                id="outputSchemaJsonRaw"
+                label="Output Schema (JSON)"
+                type="text"
+                fullWidth
+                multiline
+                rows={10}
+                variant="standard"
+                value={outputSchemaJsonRaw}
+                onChange={(e) => setOutputSchemaJsonRaw(e.target.value)}
+                sx={{ mb: 2 }}
+              />
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button onClick={handleSubmit}>{currentTool ? 'Update' : 'Add'}</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={openHelpDialog} onClose={handleCloseHelpDialog} maxWidth="md" fullWidth>
+        <DialogTitle>{helpDialogTitle}</DialogTitle>
+        <DialogContent>
+          <Typography component="pre" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            {helpDialogContent}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseHelpDialog}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+interface ParameterRowProps {
+  parameter: Parameter;
+  onChange: (parameter: Parameter) => void;
+  onRemove: () => void;
+}
+
+const ParameterRow: React.FC<ParameterRowProps> = ({ parameter, onChange, onRemove }) => {
+  const handleTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newType = e.target.value as Parameter['type'];
+    onChange({ ...parameter, type: newType, defaultValue: undefined, enum: undefined });
+  };
+
+  const handleDefaultValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value: string | number | boolean = e.target.value;
+    if (parameter.type === 'integer') value = parseInt(value as string);
+    else if (parameter.type === 'boolean') value = (value as string).toLowerCase() === 'true';
+    onChange({ ...parameter, defaultValue: value });
+  };
+
+  const parameterHelpContent = `
+    Define a parameter for the tool's input or output schema.
+
+    - Name: The unique name of the parameter (e.g., 'city', 'temperature').
+    - Type: The data type of the parameter (e.g., string, integer, boolean, array, object).
+    - Description: A brief explanation of what the parameter represents.
+    - Required: Check if this parameter is mandatory.
+    - Default Value: An optional default value for the parameter.
+    - Enum: For 'string' type, a comma-separated list of allowed values (e.g., 'celsius, fahrenheit').
+
+    Example JSON Schema for a parameter:
+    {
+      "type": "string",
+      "description": "The city to get the weather for",
+      "enum": ["New York", "London"],
+      "default": "New York"
+    }
+  `;
+
+  return (
+    <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>
+      <TextField
+        margin="dense"
+        label="Name"
+        variant="standard"
+        value={parameter.name}
+        onChange={(e) => onChange({ ...parameter, name: e.target.value })}
+        sx={{ flex: 1 }}
+      />
+      <TextField
+        margin="dense"
+        label="Type"
+        select
+        variant="standard"
+        value={parameter.type}
+        onChange={handleTypeChange}
+        sx={{ flex: 0.5 }}
+      >
+        <MenuItem value="string">string</MenuItem>
+        <MenuItem value="integer">integer</MenuItem>
+        <MenuItem value="boolean">boolean</MenuItem>
+        <MenuItem value="array">array</MenuItem>
+        <MenuItem value="object">object</MenuItem>
+      </TextField>
+      <TextField
+        margin="dense"
+        label="Description"
+        variant="standard"
+        value={parameter.description}
+        onChange={(e) => onChange({ ...parameter, description: e.target.value })}
+        sx={{ flex: 1.5 }}
+      />
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={parameter.required}
+            onChange={(e) => onChange({ ...parameter, required: e.target.checked })}
+            name="required"
+          />
+        }
+        label="Required"
+        sx={{ flex: 0.5 }}
+      />
+      {(parameter.type === 'string' || parameter.type === 'integer' || parameter.type === 'boolean') && (
+        <TextField
+          margin="dense"
+          label="Default Value"
+          variant="standard"
+          value={parameter.defaultValue !== undefined ? String(parameter.defaultValue) : ''}
+          onChange={handleDefaultValueChange}
+          sx={{ flex: 0.8 }}
+        />
+      )}
+      {parameter.type === 'string' && (
+        <TextField
+          margin="dense"
+          label="Enum (comma-separated)"
+          variant="standard"
+          value={parameter.enum || ''}
+          onChange={(e) => onChange({ ...parameter, enum: e.target.value })}
+          sx={{ flex: 1 }}
+        />
+      )}
+      <IconButton onClick={onRemove} size="small">
+        <DeleteIcon />
+      </IconButton>
+    </Box>
+  );
+};
+
+export default ToolManagementPage;
