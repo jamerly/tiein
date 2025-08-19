@@ -8,11 +8,9 @@ const api = axios.create({
 api.interceptors.request.use(
   (config: AxiosRequestConfig) => {
     const token = localStorage.getItem('jwtToken');
-    console.log('Token from localStorage in interceptor:', token);
     if (token) {
       config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('Authorization header set:', config.headers.Authorization);
     }
     return config;
   },
