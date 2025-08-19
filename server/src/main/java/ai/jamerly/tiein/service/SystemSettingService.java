@@ -12,6 +12,7 @@ import java.util.Optional;
 public class SystemSettingService {
 
     private static final String REGISTRATION_OPEN_KEY = "registration.open";
+    private static final String OPENAI_API_KEY = "openai.api.key"; // New constant for OpenAI API Key
 
     @Autowired
     private SystemSettingRepository systemSettingRepository;
@@ -32,6 +33,36 @@ public class SystemSettingService {
         }
         setting.setSettingValue(String.valueOf(open));
         systemSettingRepository.save(setting);
+    }
+
+    public String getOpenAIApiKey() {
+        Optional<SystemSetting> setting = systemSettingRepository.findBySettingKey(OPENAI_API_KEY);
+        return setting.map(SystemSetting::getSettingValue).orElse(null); // Return null if not set
+    }
+
+    public void setOpenAIApiKey(String apiKey) {
+        Optional<SystemSetting> settingOptional = systemSettingRepository.findBySettingKey(OPENAI_API_KEY);
+
+        if (apiKey == null) {
+            // If API key is null or empty, delete the setting if it exists
+            settingOptional.ifPresent(systemSetting -> systemSettingRepository.delete(systemSetting));
+        } else {
+            // Otherwise, save or update the setting
+            SystemSetting setting;
+            if (settingOptional.isPresent()) {
+                setting = settingOptional.get();
+            } else {
+                setting = new SystemSetting();
+                setting.setSettingKey(OPENAI_API_KEY);
+            }
+            setting.setSettingValue(apiKey);
+            systemSettingRepository.save(setting);
+        }
+    }
+
+    public void deleteOpenAIApiKey() {
+        Optional<SystemSetting> settingOptional = systemSettingRepository.findBySettingKey(OPENAI_API_KEY);
+        settingOptional.ifPresent(systemSetting -> systemSettingRepository.delete(systemSetting));
     }
 
     public List<SystemSetting> getAllSystemSettings() {

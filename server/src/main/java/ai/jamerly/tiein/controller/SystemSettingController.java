@@ -23,4 +23,23 @@ public class SystemSettingController {
         systemSettingService.setRegistrationOpen(open);
         return ResponseEntity.ok(ApiResponse.success("Registration status updated successfully."));
     }
+
+    @GetMapping("/openai/key")
+    public ResponseEntity<ApiResponse<String>> getOpenAIApiKey() {
+        String apiKey = systemSettingService.getOpenAIApiKey();
+        return ResponseEntity.ok(ApiResponse.success(apiKey));
+    }
+
+    @PostMapping("/openai/key")
+    public ResponseEntity<ApiResponse<String>> setOpenAIApiKey(@RequestBody String apiKey) {
+        systemSettingService.setOpenAIApiKey(apiKey);
+        return ResponseEntity.ok(ApiResponse.success("OpenAI API Key updated successfully."));
+    }
+
+    @DeleteMapping("/openai/key")
+    public ResponseEntity<ApiResponse<String>> deleteOpenApiKey(){
+        systemSettingService.deleteOpenAIApiKey();
+        return ResponseEntity.ok(ApiResponse.success("OpenAI API Key deleted successfully."));
+
+    }
 }

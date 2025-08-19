@@ -54,9 +54,11 @@ public class SecurityConfig {
                         "/user/register",
                         "/user/login",
                         "/mcp-server/status/initialized",
+                        "/chat/openai",
                         "/mcp-server/health", // Health check should be public
                         "/mcp-server/info" // Server info should be public
                 ).permitAll() // Allow registration, login, and public info without authentication
+                .requestMatchers( "/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated() // All other requests require authentication
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Stateless session

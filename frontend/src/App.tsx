@@ -76,11 +76,11 @@ const App: React.FC = () => {
               <Layout>
                 <Routes>
                   <Route path="/dashboard" element={<DashboardPage />} />
-                  <Route path="/users" element={<UserManagementPage />} />
+                  <Route path="/users" element={<SystemSettingsPage initialTab="users" />} />
                   <Route path="/tools" element={<ToolManagementPage />} />
                   <Route path="/resources" element={<ResourceManagementPage />} />
                   <Route path="/prompts" element={<PromptManagementPage />} />
-                  <Route path="/settings" element={<SystemSettingsPage />} />
+                  <Route path="/settings" element={<SystemSettingsPage initialTab="general" />} />
                   <Route path="/profile" element={<UserSettingPage />} />
                   {/* Fallback for any other unmatched path within authenticated area */}
                   <Route path="*" element={<Navigate to="/dashboard" />} />

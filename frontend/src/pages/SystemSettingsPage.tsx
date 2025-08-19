@@ -1,39 +1,49 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Box, CircularProgress, Switch, FormControlLabel, Alert, Button, Card, CardContent, Grid, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
+import { Typography, Box, CircularProgress, Switch, FormControlLabel, Alert, Button, Card, CardContent, Grid, List, ListItem, ListItemButton, ListItemIcon, ListItemText, TextField } from '@mui/material';
 import { Settings as SettingsIcon, People as PeopleIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import UserManagementPage from './UserManagementPage'; // Import UserManagementPage
 
-const SystemSettingsPage: React.FC = () => {
+interface SystemSettingsPageProps {
+  initialTab?: 'general' | 'users';
+}
+
+const SystemSettingsPage: React.FC<SystemSettingsPageProps> = ({ initialTab = 'general' }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState<boolean | null>(null);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
-  const [selectedMenuItem, setSelectedMenuItem] = useState('general'); // Default to general settings
+  const [openAIApiKey, setOpenAIApiKey] = useState<string>('');
+  const [openAIApiKeyStatus, setOpenAIApiKeyStatus] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [selectedMenuItem, setSelectedMenuItem] = useState(initialTab); // Default to general settings
 
   const menuItemsData = [
     { id: 'general', text: 'General Settings', icon: <SettingsIcon /> },
     { id: 'users', text: 'User Management', icon: <PeopleIcon /> },
   ];
 
-  const fetchRegistrationStatus = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await api.get<boolean>('/admin/settings/registration/status');
-      setIsRegistrationOpen(response);
-    } catch (err: unknown) {
-      setError((err as Error).message || 'Failed to fetch registration status.');
-      console.error('Fetch registration status error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchRegistrationStatus();
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const registrationResponse = await api.get<boolean>('/admin/settings/registration/status');
+        setIsRegistrationOpen(registrationResponse);
+
+        const apiKeyResponse = await api.get<string>('/admin/settings/openai/key');
+        setOpenAIApiKey(apiKeyResponse || ''); // Set to empty string if null
+
+      } catch (err: unknown) {
+        setError((err as Error).message || 'Failed to fetch settings.');
+        console.error('Fetch settings error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
   const handleToggleRegistration = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,6 +60,28 @@ const SystemSettingsPage: React.FC = () => {
       setIsRegistrationOpen(!newStatus);
     }
   };
+
+      const handleSaveOpenAIApiKey = async () => {
+        setOpenAIApiKeyStatus(null);
+        try {
+            if (openAIApiKey === '') {
+                // If the API key is empty, call the DELETE endpoint
+                await api.delete('/admin/settings/openai/key');
+                setOpenAIApiKeyStatus({ message: 'OpenAI API Key deleted successfully!', type: 'success' });
+            } else {
+                // Otherwise, call the POST endpoint to update/set the key
+                await api.post('/admin/settings/openai/key', openAIApiKey, {
+                    headers: {
+                        'Content-Type': 'text/plain',
+                    },
+                });
+                setOpenAIApiKeyStatus({ message: 'OpenAI API Key updated successfully!', type: 'success' });
+            }
+        } catch (err: any) {
+            setOpenAIApiKeyStatus({ message: (err as Error).message || 'Failed to update OpenAI API Key.', type: 'error' });
+            console.error('Update OpenAI API Key error:', err);
+        }
+    };
 
   if (loading) {
     return (
@@ -114,6 +146,26 @@ const SystemSettingsPage: React.FC = () => {
                     {updateStatus}
                   </Alert>
                 )}
+
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="h6" gutterBottom>OpenAI API Key</Typography>
+                  <TextField
+                    fullWidth
+                    label="OpenAI API Key"
+                    variant="outlined"
+                    value={openAIApiKey}
+                    onChange={(e) => setOpenAIApiKey(e.target.value)}
+                    sx={{ mb: 2 }}
+                  />
+                  <Button variant="contained" onClick={handleSaveOpenAIApiKey}>
+                    Save OpenAI API Key
+                  </Button>
+                  {openAIApiKeyStatus && (
+                    <Alert severity={openAIApiKeyStatus.type} sx={{ mt: 2 }}>
+                      {openAIApiKeyStatus.message}
+                    </Alert>
+                  )}
+                </Box>
               </CardContent>
             </Card>
           )}

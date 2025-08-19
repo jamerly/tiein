@@ -4,6 +4,8 @@ import ai.jamerly.tiein.entity.User;
 import ai.jamerly.tiein.repository.UserRepository;
 import ai.jamerly.tiein.security.jwt.JwtUtil; // Use the new JwtUtil
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -11,6 +13,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -32,13 +35,21 @@ public class UserService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
-        return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), new ArrayList<>());
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        if (user.getRole() != null && !user.getRole().isEmpty()) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole()));
+        }
+        return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), authorities);
     }
 
     public UserDetails loadUserByPermanentToken(String permanentToken) throws UsernameNotFoundException {
         User user = userRepository.findByPermanentToken(permanentToken)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with permanent token."));
-        return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), new ArrayList<>());
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        if (user.getRole() != null && !user.getRole().isEmpty()) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole()));
+        }
+        return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), authorities);
     }
 
     public String login(String username, String password) {

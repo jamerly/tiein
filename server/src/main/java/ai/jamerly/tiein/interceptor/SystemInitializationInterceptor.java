@@ -3,9 +3,11 @@ package ai.jamerly.tiein.interceptor;
 import ai.jamerly.tiein.entity.User;
 import ai.jamerly.tiein.repository.UserRepository;
 import ai.jamerly.tiein.security.jwt.JwtUtil;
+import com.alibaba.druid.util.StringUtils;
 import com.alibaba.fastjson2.JSONObject;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jsoup.internal.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -35,10 +37,6 @@ public class SystemInitializationInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        // Admin role check for specific paths (e.g., /admin/**)
-        // This interceptor is applied to all paths except /user/register and /user/login
-        // So, for other paths, we check for admin role.
-
         String authHeader = request.getHeader("Authorization");
         String token = null;
         String username = null;
@@ -63,7 +61,7 @@ public class SystemInitializationInterceptor implements HandlerInterceptor {
             Optional<User> userOptional = userRepository.findByUsername(username);
             if (userOptional.isPresent()) {
                 User user = userOptional.get();
-                if ("ADMIN".equals(user.getRole())) {
+                if ("ADMIN".equals(user.getRole()) || "USER".equals(user.getRole())) {
                     return true; // Admin user, proceed
                 } else {
                     response.setStatus(HttpStatus.FORBIDDEN.value());

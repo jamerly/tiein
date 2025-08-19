@@ -108,15 +108,19 @@ const UserManagementPage: React.FC = () => {
   }
 
   return (
-    <Box sx={{}}>
-      <Button 
-        variant="contained" 
-        startIcon={<AddIcon />} 
-        onClick={() => handleOpenDialog()} 
-        sx={{ mb: 2 }}
-      >
-        Add User
-      </Button>
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h4" gutterBottom>
+          User Management
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpenDialog()}
+        >
+          Add User
+        </Button>
+      </Box>
       <TableContainer component={Paper}>
         <Table sx={{ minWidth: 650 }} aria-label="user table">
           <TableHead>
