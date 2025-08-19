@@ -1,8 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Typography, Box, CircularProgress, 
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, 
-  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert, MenuItem, InputAdornment, FormControlLabel, Checkbox, TablePagination
+import {
+  Typography,
+  Box,
+  CircularProgress,
+  Grid,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Button,
+  IconButton,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
+  Alert,
+  MenuItem,
+  InputAdornment,
+  FormControlLabel,
+  Checkbox,
+  Switch,
+  TablePagination,
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, InfoOutlined as InfoOutlinedIcon } from '@mui/icons-material';
 import api from '../services/api';
@@ -20,6 +42,7 @@ interface Tool {
   description?: string;
   inputSchemaJson?: string;
   outputSchemaJson?: string;
+  isProxy?: boolean; // Added isProxy field
 }
 
 interface ApiResponseData {
@@ -93,6 +116,8 @@ const ToolManagementPage: React.FC = () => {
   const [openHelpDialog, setOpenHelpDialog] = useState(false);
   const [helpDialogTitle, setHelpDialogTitle] = useState('');
   const [helpDialogContent, setHelpDialogContent] = useState('');
+
+  const [isProxy, setIsProxy] = useState(false); // State for isProxy
 
   // Helper to convert JSON Schema to Parameter[]
   const jsonSchemaToParameters = (schemaJson?: string): Parameter[] => {
@@ -312,6 +337,7 @@ const ToolManagementPage: React.FC = () => {
     setOutputSchemaJsonRaw(tool?.outputSchemaJson || '');
     setInputSchemaMode('form'); // Default to form mode
     setOutputSchemaMode('form'); // Default to form mode
+    setIsProxy(tool?.isProxy || false); // Initialize isProxy state
     setDialogError(null);
     setOpenDialog(true);
   };
@@ -333,6 +359,7 @@ const ToolManagementPage: React.FC = () => {
     setOutputSchemaJsonRaw('');
     setInputSchemaMode('form');
     setOutputSchemaMode('form');
+    setIsProxy(false); // Clear isProxy state
     setDialogError(null);
   };
 
@@ -386,6 +413,7 @@ const ToolManagementPage: React.FC = () => {
         httpHeaders: type === 'HTTP' ? finalHttpHeaders : undefined,
         httpBody: type === 'HTTP' ? httpBody : undefined,
         groovyScript: type === 'GROOVY' ? groovyScript : undefined,
+        isProxy: isProxy, // Include isProxy in toolData
       };
 
       if (currentTool) {
@@ -453,10 +481,8 @@ const ToolManagementPage: React.FC = () => {
             <TableRow>
               <TableCell>ID</TableCell>
               <TableCell>Name</TableCell>
-              <TableCell>Type</TableCell>
-              <TableCell>Method</TableCell>
               <TableCell>URL</TableCell>
-              <TableCell>Description</TableCell>
+              <TableCell>Proxy</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -467,10 +493,8 @@ const ToolManagementPage: React.FC = () => {
                   {tool.id}
                 </TableCell>
                 <TableCell>{tool.name}</TableCell>
-                <TableCell>{tool.type}</TableCell>
-                <TableCell>{tool.httpMethod || 'N/A'}</TableCell>
                 <TableCell>{tool.httpUrl || 'N/A'}</TableCell>
-                <TableCell>{tool.description || 'N/A'}</TableCell>
+                <TableCell>{tool.isProxy ? 'Yes' : 'No'}</TableCell>
                 <TableCell align="right">
                   <IconButton aria-label="edit" onClick={() => handleOpenDialog(tool)}>
                     <EditIcon />
@@ -501,7 +525,7 @@ const ToolManagementPage: React.FC = () => {
         <DialogTitle>{currentTool ? 'Edit Tool' : 'Add Tool'}</DialogTitle>
         <DialogContent>
           {dialogError && <Alert severity="error" sx={{ mb: 2 }}>{dialogError}</Alert>}
-          <TextField
+           <TextField
             autoFocus
             margin="dense"
             id="name"
@@ -513,39 +537,52 @@ const ToolManagementPage: React.FC = () => {
             onChange={(e) => setName(e.target.value)}
             sx={{ mb: 2 }}
           />
-          <TextField
-            margin="dense"
-            id="type"
-            label="Type"
-            select
-            fullWidth
-            variant="standard"
-            value={type}
-            onChange={(e) => setType(e.target.value as 'HTTP' | 'GROOVY')}
-            sx={{ mb: 2 }}
-          >
-            <MenuItem value="HTTP">HTTP</MenuItem>
-            <MenuItem value="GROOVY">GROOVY</MenuItem>
-          </TextField>
-
+          <Box sx={{ mb: 2 , display: 'flex', flexDirection: 'row', gap: 1 }}>
+            <TextField
+                  margin="dense"
+                  id="type"
+                  label="Type"
+                  select
+                  variant="standard"
+                  sx={{ width: 100 }}
+                  value={type}
+                  onChange={(e) => setType(e.target.value as 'HTTP' | 'GROOVY')}
+                >
+                  <MenuItem value="HTTP">HTTP</MenuItem>
+                  <MenuItem value="GROOVY">GROOVY</MenuItem>
+            </TextField>
+            <TextField
+                    margin="dense"
+                    id="httpMethod"
+                    label="HTTP Method"
+                    select
+                    sx={{ width: 100 }}
+                    variant="standard"
+                    value={httpMethod}
+                    onChange={(e) => setHttpMethod(e.target.value as 'GET' | 'POST' | 'PUT' | 'DELETE')}
+                  >
+                    <MenuItem value="GET">GET</MenuItem>
+                    <MenuItem value="POST">POST</MenuItem>
+                    <MenuItem value="PUT">PUT</MenuItem>
+                    <MenuItem value="DELETE">DELETE</MenuItem>
+            </TextField>
+            {type === 'HTTP' && (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={isProxy}
+                        onChange={(e) => setIsProxy(e.target.checked)}
+                        name="isProxy"
+                        color="primary"
+                        sx={{ flex: 1 }}
+                      />
+                    }
+                    label="Requires Proxy"
+                  />
+              )}
+          </Box>
           {type === 'HTTP' && (
             <>
-              <TextField
-                margin="dense"
-                id="httpMethod"
-                label="HTTP Method"
-                select
-                fullWidth
-                variant="standard"
-                value={httpMethod}
-                onChange={(e) => setHttpMethod(e.target.value as 'GET' | 'POST' | 'PUT' | 'DELETE')}
-                sx={{ mb: 2 }}
-              >
-                <MenuItem value="GET">GET</MenuItem>
-                <MenuItem value="POST">POST</MenuItem>
-                <MenuItem value="PUT">PUT</MenuItem>
-                <MenuItem value="DELETE">DELETE</MenuItem>
-              </TextField>
               <TextField
                 margin="dense"
                 id="httpUrl"
@@ -586,68 +623,9 @@ const ToolManagementPage: React.FC = () => {
                   Add Header
                 </Button>
               </Box>
-              <TextField
-                margin="dense"
-                id="httpBody"
-                label="HTTP Body (JSON)"
-                type="text"
-                fullWidth
-                multiline
-                rows={4}
-                variant="standard"
-                value={httpBody}
-                onChange={(e) => setHttpBody(e.target.value)}
-                sx={{ mb: 2 }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => handleOpenHelpDialog(
-                          'HTTP Body Example',
-                          'Enter HTTP request body as a JSON object. Example:\n{\n  "param1": "value1",\n  "param2": 123\n}'
-                        )}
-                        edge="end"
-                      >
-                        <InfoOutlinedIcon />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
             </>
           )}
-
-          {type === 'GROOVY' && (
-            <TextField
-              margin="dense"
-              id="groovyScript"
-              label="Groovy Script"
-              type="text"
-              fullWidth
-              multiline
-              rows={10}
-              variant="standard"
-              value={groovyScript}
-              onChange={(e) => setGroovyScript(e.target.value)}
-              sx={{ mb: 2 }}
-            />
-          )}
-
-          <TextField
-            margin="dense"
-            id="description"
-            label="Description"
-            type="text"
-            fullWidth
-            multiline
-            rows={3}
-            variant="standard"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            sx={{ mb: 2 }}
-          />
-
-          <Box sx={{ mb: 2 }}>
+        <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle1" gutterBottom>
               Input Schema Parameters
               <IconButton

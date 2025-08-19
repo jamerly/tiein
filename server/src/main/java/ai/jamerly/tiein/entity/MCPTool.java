@@ -39,6 +39,9 @@ public class MCPTool {
     @Column(columnDefinition = "TEXT")
     private String outputSchemaJson;
 
+    // New field for proxy
+    private Boolean isProxy; // Indicates if the tool requires proxy requests
+
     public enum ToolType {
         HTTP,
         GROOVY

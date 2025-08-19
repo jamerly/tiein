@@ -61,6 +61,7 @@ public class MCPToolService {
                     tool.setDescription(updatedTool.getDescription());
                     tool.setInputSchemaJson(updatedTool.getInputSchemaJson());
                     tool.setOutputSchemaJson(updatedTool.getOutputSchemaJson());
+                    tool.setIsProxy(updatedTool.getIsProxy()); // Copy isProxy field
                     return mcpToolRepository.save(tool);
                 }).orElse(null);
     }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { ReactNode } from 'react';
-import { AppBar, Toolbar, Typography, Button, Box, List, ListItem, ListItemText, CssBaseline, Menu, MenuItem } from '@mui/material';
+import { AppBar, Toolbar, Typography, Button, Box, List, ListItem, ListItemText, CssBaseline, Menu, MenuItem, Link } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -88,6 +88,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </AppBar>
       <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}> {/* mt for AppBar height */}
         {children}
+      </Box>
+      <Box component="footer" sx={{ p: 2, mt: 'auto', bgcolor: 'background.paper', textAlign: 'center' }}>
+        <Typography variant="body2" color="text.secondary">
+          {'Copyright © '}
+          <Link color="inherit" href="https://www.jamerly.ai" target="_blank" rel="noopener noreferrer">
+            Jamerly Global
+          </Link>{' '}
+          {new Date().getFullYear()}.
+          {' All rights reserved.'}
+        </Typography>
       </Box>
     </Box>
   );
