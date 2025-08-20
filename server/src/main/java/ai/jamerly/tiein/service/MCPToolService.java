@@ -56,6 +56,10 @@ public class MCPToolService {
         return mcpToolRepository.findByName(name);
     }
 
+    public List<MCPTool> getToolsByGroupId(Long groupId) {
+        return mcpToolRepository.findByGroupId(groupId);
+    }
+
     @Transactional
     public MCPTool createTool(MCPTool tool) {
         if (tool.getGroupId() != null) {

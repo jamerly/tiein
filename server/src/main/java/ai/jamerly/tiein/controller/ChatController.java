@@ -24,9 +24,10 @@ public class ChatController {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @GetMapping(value = "/openai")
-    public Flux<ServerSentEvent<String>> chatWithOpenAI(@RequestParam("message") String message) {
+    public Flux<ServerSentEvent<String>> chatWithOpenAI(@RequestParam("message") String message, @RequestParam(value = "groupId", required = false) String groupId) {
         AIRequest aiRequest = new AIRequest();
         aiRequest.setPrompt(message);
+        aiRequest.setGroupId(groupId);
 
         return openAIRequestAssembler.invoke(aiRequest)
                 .map(content -> ServerSentEvent.<String>builder()

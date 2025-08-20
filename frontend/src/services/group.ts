@@ -9,8 +9,7 @@ export interface Group {
 }
 
 export const fetchGroups = async ( page?: number, pageSize?: number): Promise<PagableResponse<Group>> => {
-    const response = await HttpService.getPagable<Group>(`/mcp/groups`, page, pageSize)
-    return response;
+    return await HttpService.getPagable<Group>(`/mcp/groups`, page, pageSize)
 }
 
 export const createGroup = async (groupName: string): Promise<Group> => {

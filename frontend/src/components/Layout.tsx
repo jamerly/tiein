@@ -38,9 +38,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const menuItems = [
     { text: 'Dashboard', path: '/dashboard' },
     { text: 'Tools', path: '/tools' },
-    { text: 'Groups', path: '/groups' }, // New: Global Group Management
     { text: 'Resources', path: '/resources' },
     { text: 'Prompts', path: '/prompts' },
+    { text: 'Groups', path: '/groups' }, 
+    { text: 'Workers', path: '/workers' },
   ];
 
   return (

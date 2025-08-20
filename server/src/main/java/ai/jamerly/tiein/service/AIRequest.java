@@ -17,4 +17,6 @@ public class AIRequest {
 
     private String apiKey;
 
+    private String groupId;
+
 }

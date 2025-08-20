@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import ai.jamerly.tiein.entity.MCPTool;
 
 
 @Slf4j
@@ -23,6 +24,9 @@ import java.util.Map;
 public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
     @Autowired // Autowire SystemSettingService
     private SystemSettingService systemSettingService;
+
+    @Autowired // Autowire MCPToolService
+    private MCPToolService mcpToolService;
 
     private String apiUrl = "https://api.openai.com/v1/chat/completions";
 
@@ -43,6 +47,34 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
         requestBody.put("max_tokens", aiRequest.getMaxToken());
 //        requestBody.put("temperature", aiRequest.getTemperature());
         requestBody.put("stream", true);
+
+        // Add tools based on groupId
+        if (aiRequest.getGroupId() != null && !aiRequest.getGroupId().isEmpty()) {
+            try {
+                Long groupId = Long.parseLong(aiRequest.getGroupId());
+                List<MCPTool> tools = mcpToolService.getToolsByGroupId(groupId);
+                if (!tools.isEmpty()) {
+                    JSONArray toolsArray = new JSONArray();
+                    for (MCPTool tool : tools) {
+                        JSONObject toolObject = new JSONObject();
+                        toolObject.put("type", "function");
+                        JSONObject functionObject = new JSONObject();
+                        functionObject.put("name", tool.getName());
+                        functionObject.put("description", tool.getDescription());
+                        if (tool.getInputSchemaJson() != null && !tool.getInputSchemaJson().isEmpty()) {
+                            functionObject.put("parameters", JSONObject.parseObject(tool.getInputSchemaJson()));
+                        }
+                        toolObject.put("function", functionObject);
+                        toolsArray.add(toolObject);
+                    }
+                    requestBody.put("tools", toolsArray);
+                }
+            } catch (NumberFormatException e) {
+                log.error("Invalid groupId format: {}", aiRequest.getGroupId());
+            } catch (Exception e) {
+                log.error("Error assembling tools for groupId {}: {}", aiRequest.getGroupId(), e.getMessage());
+            }
+        }
 
         return new HttpEntity<>(requestBody.toJSONString(), headers);
     }

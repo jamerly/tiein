@@ -11,6 +11,7 @@ import SystemSettingsPage from './pages/SystemSettingsPage';
 import UserSettingPage from './pages/UserSettingPage';
 import RegisterPage from './pages/RegisterPage';
 import GroupManagementPage from './pages/GroupManagementPage'; // New Import
+import WorkerManagementPage from './pages/WorkerManagementPage'; // New Import
 import Layout from './components/Layout';
 import api from './services/api';
 import { CircularProgress, Box, Typography } from '@mui/material';
@@ -80,6 +81,7 @@ const App: React.FC = () => {
                   <Route path="/users" element={<SystemSettingsPage initialTab="users" />} />
                   <Route path="/tools" element={<ToolManagementPage />} />
                   <Route path="/groups" element={<GroupManagementPage />} /> {/* New Route */}
+                  <Route path="/workers" element={<WorkerManagementPage />} /> {/* New Route */}
                   <Route path="/resources" element={<ResourceManagementPage />} />
                   <Route path="/prompts" element={<PromptManagementPage />} />
                   <Route path="/settings" element={<SystemSettingsPage initialTab="general" />} />
