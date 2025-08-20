@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
+import { HttpService} from '../services/api';
 import {
   Container,
   Box,
@@ -25,8 +25,8 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post('/user/login', { username, password });
-      login(response.data.token);
+      const response = await HttpService.post<string>('/user/login', { username, password });
+      login(response);
       navigate('/dashboard');
     } catch (err: unknown) {
       setError((err as Error).message || 'Login failed');

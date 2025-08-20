@@ -58,9 +58,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{  }}>
-            TieIn
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <img src="/assets/logo.svg" alt="TieIn Logo" style={{ height: '30px', marginRight: '10px' }} />
+            <b>TieIn</b>
+          </Box>
           <Box sx={{ flexGrow: 1, display: { xs: 'none', sm: 'flex' }, justifyContent: 'center' }}>
             {menuItems.map((item) => (
               <Button

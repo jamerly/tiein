@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import api from '../services/api'; // Assuming api service is in ../services/api
+import api,{  HttpService } from '../services/api'; // Assuming api service is in ../services/api
 
 // Define a simple User interface for the profile data
 interface UserProfile {
@@ -31,7 +31,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchUserProfile = async () => {
     try {
       const response = await api.get<UserProfile>('/user/profile');
-      setUser(response.data);
+      setUser(response);
     } catch (err) {
       console.error('Failed to fetch user profile:', err);
       setUser(null); // Clear user if fetch fails
@@ -54,6 +54,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = async (token: string) => {
+    console.log('Login function called with token:', token);
     localStorage.setItem('jwtToken', token);
     console.log('Token saved to localStorage:', token);
     setIsAuthenticated(true);

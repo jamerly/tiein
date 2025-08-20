@@ -265,32 +265,6 @@ const DashboardPage: React.FC = () => {
           </Button>
         </Box>
       </Paper>
-
-      <Typography variant="h4" gutterBottom>
-        Dashboard Overview
-      </Typography>
-
-      <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
-        Quick Actions
-      </Typography>
-      <Grid container spacing={2}>
-        <Grid>
-          <Button variant="contained" onClick={() => navigate('/users')}>User Management</Button>
-        </Grid>
-        <Grid>
-          <Button variant="contained" onClick={() => navigate('/tools')}>Tool Management</Button>
-        </Grid>
-        <Grid>
-          <Button variant="contained" onClick={() => navigate('/resources')}>Resource Management</Button>
-        </Grid>
-        <Grid>
-          <Button variant="contained" onClick={() => navigate('/prompts')}>Prompt Management</Button>
-        </Grid>
-        <Grid>
-          <Button variant="contained" onClick={() => navigate('/settings')}>System Settings</Button>
-        </Grid>
-      </Grid>
-
       <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
         MCP Server Usage Guide
       </Typography>
