@@ -1,9 +1,12 @@
 package ai.jamerly.tiein.service;
 
 import ai.jamerly.tiein.util.BizException;
+import com.alibaba.druid.util.StringUtils;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.internal.StringUtil;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -12,10 +15,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import reactor.core.publisher.Flux;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
 import ai.jamerly.tiein.entity.MCPTool;
 
 
@@ -59,8 +60,8 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
                         JSONObject toolObject = new JSONObject();
                         toolObject.put("type", "function");
                         JSONObject functionObject = new JSONObject();
-                        functionObject.put("name", tool.getName());
-                        functionObject.put("description", tool.getDescription());
+                        functionObject.put("name", "tool_" + tool.getId());
+                        functionObject.put("description", tool.getName() + ":"+ tool.getDescription());
                         if (tool.getInputSchemaJson() != null && !tool.getInputSchemaJson().isEmpty()) {
                             functionObject.put("parameters", JSONObject.parseObject(tool.getInputSchemaJson()));
                         }
@@ -97,8 +98,9 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
             newHistoricalMessages.add(currentUserMessage);
         }
         request.setHistoricalMessages(newHistoricalMessages);
-
-        return super.invoke(request)
+        Map<String,String> toolsResult = new HashMap<>();
+        List<Map<String, Object>> finalNewHistoricalMessages = newHistoricalMessages;
+        return super.invokeWithStream(request)
                 .doOnError(HttpClientErrorException.class, httpClientErrorException -> {
                     if (httpClientErrorException.getMessage().contains("429 Too Many Requests")) {
                         log.warn("429 Too Many Requests. Consider implementing retry logic here.");
@@ -118,8 +120,46 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
                                 JSONObject firstChoice = choices.getJSONObject(0);
                                 if (firstChoice.containsKey("delta")) {
                                     JSONObject delta = firstChoice.getJSONObject("delta");
-                                    if (delta.containsKey("content")) {
-                                        return delta.getString("content");
+                                    JSONArray toolCalls = new JSONArray() ;
+                                    if( delta.containsKey("tool_calls")){
+                                        toolCalls =  delta.getJSONArray("tool_calls");
+                                    }
+                                    if( toolCalls.size() > 0 ){
+                                        for( int i=0;i<toolCalls.size();i++){
+                                            JSONObject tool = toolCalls.getJSONObject(i);
+                                            String toolId = tool.getString("id");
+                                            String toolType = tool.getString("type");
+                                            JSONObject function = tool.getJSONObject(toolType);
+                                            Object arguments = function.get("arguments");
+                                            String toolName = function.getString("name");
+                                            Long realToolId = Long.parseLong( toolName.split("_")[1] );
+                                            String toolReturn = mcpToolService.callTool(realToolId,arguments);
+                                            toolsResult.put(toolId,toolReturn);
+                                        }
+                                    }
+                                    if( !toolsResult.isEmpty() ){
+                                        List<Map<String, Object>> nextHistoricalMessages = new ArrayList<>(finalNewHistoricalMessages);
+                                        toolsResult.keySet().forEach(t->{
+                                            Map<String, Object> currentUserMessage = new HashMap<>();
+                                            currentUserMessage.put("role", "user");
+                                            currentUserMessage.put("content", request.getPrompt());
+                                            JSONObject toolReplyJSON = new JSONObject();
+                                            toolReplyJSON.put("type", "tool_result");
+                                            toolReplyJSON.put("tool_use_id", t);
+                                            toolReplyJSON.put("content", (String)toolsResult.get(t));
+                                            nextHistoricalMessages.add(toolReplyJSON);
+                                        });
+                                        AIRequest request1 = new AIRequest();
+                                        BeanUtils.copyProperties(request,request1);
+                                        request1.setStream(Boolean.FALSE);
+                                        request1.setHistoricalMessages(nextHistoricalMessages);
+                                        return invoke(request1);
+                                    }
+                                    String message = delta.getString("content");
+                                    if(!StringUtils.isEmpty(message)){
+                                        return message;
+                                    }else{
+                                        return "";
                                     }
                                 }
                             }

@@ -3,6 +3,7 @@ package ai.jamerly.tiein.service;
 import ai.jamerly.tiein.dto.ToolExecutionResult;
 import ai.jamerly.tiein.entity.MCPTool;
 import ai.jamerly.tiein.repository.MCPToolRepository;
+import com.alibaba.fastjson2.JSONObject;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import groovy.lang.Binding;
@@ -246,5 +247,9 @@ public class MCPToolService {
             result.setErrorMessage("Groovy Tool execution failed: " + e.getMessage());
             return result;
         }
+    }
+
+    public String callTool(Long toolId, Object parameters){
+        return "SUCCEED";
     }
 }

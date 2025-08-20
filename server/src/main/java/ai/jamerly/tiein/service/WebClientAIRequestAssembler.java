@@ -24,7 +24,7 @@ public class WebClientAIRequestAssembler implements AIRequestAssembler {
     }
 
     @Override
-    public Flux<String> invoke(AIRequest request) {
+    public Flux<String> invoke(AIRequest request){
         WebClient webClient = webClientBuilder.baseUrl(getApiUrl()).build();
         HttpEntity<?> httpEntity = this.assembleRequest(request);
 

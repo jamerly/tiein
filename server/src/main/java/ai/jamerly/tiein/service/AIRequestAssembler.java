@@ -8,4 +8,5 @@ public interface AIRequestAssembler {
 
     String getApiUrl();
     Flux<String> invoke(AIRequest request);
+
 }
