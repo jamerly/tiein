@@ -1,5 +1,6 @@
 package ai.jamerly.tiein.service;
 
+import ai.jamerly.tiein.dto.ToolExecutionResult;
 import ai.jamerly.tiein.util.BizException;
 import com.alibaba.druid.util.StringUtils;
 import com.alibaba.fastjson2.JSONArray;
@@ -220,12 +221,15 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
             }
 
             Long realToolId = Long.parseLong(toolName.split("_")[1]);
-            String toolReturn = mcpToolService.callTool(realToolId, arguments);
 
+            ToolExecutionResult result = mcpToolService.executeTool(realToolId,arguments);
             Map<String, Object> toolResultMessage = new HashMap<>();
             toolResultMessage.put("role", "tool");
             toolResultMessage.put("tool_call_id", toolId);
-            toolResultMessage.put("content", toolReturn);
+            if( !result.isSuccess() ){
+                toolResultMessage.put("is_error", true);
+            }
+            toolResultMessage.put("content", result.getOutput());
             nextHistoricalMessages.add(toolResultMessage);
         }
 

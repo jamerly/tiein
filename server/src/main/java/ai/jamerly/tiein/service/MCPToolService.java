@@ -232,13 +232,32 @@ public class MCPToolService {
     private ToolExecutionResult executeGroovyTool(MCPTool tool, Map<String, Object> arguments) {
         ToolExecutionResult result = new ToolExecutionResult();
         try {
+            if (tool.getWorkerId() == null) {
+                result.setSuccess(false);
+                result.setErrorMessage("Groovy Tool is not associated with a worker.");
+                return result;
+            }
+
+            Optional<ai.jamerly.tiein.dto.WorkerDto> workerDtoOptional = workerService.getWorkerById(tool.getWorkerId());
+            if (workerDtoOptional.isEmpty()) {
+                result.setSuccess(false);
+                result.setErrorMessage("Worker not found for the given workerId.");
+                return result;
+            }
+
+            String script = workerDtoOptional.get().getScript();
+            if (script == null || script.isEmpty()) {
+                result.setSuccess(false);
+                result.setErrorMessage("Groovy script is empty for the associated worker.");
+                return result;
+            }
+
             Binding binding = new Binding();
             if (arguments != null) {
                 arguments.forEach(binding::setVariable);
             }
-
             GroovyShell shell = new GroovyShell(binding);
-            Object scriptResult = shell.evaluate(tool.getGroovyScript());
+            Object scriptResult = shell.evaluate(script);
             result.setSuccess(true);
             result.setOutput(scriptResult != null ? scriptResult.toString() : "Groovy script executed successfully (no return value).");
             return result;
