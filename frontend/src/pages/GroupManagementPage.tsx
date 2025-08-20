@@ -167,19 +167,6 @@ const GroupManagementPage: React.FC = () => {
           setPage(0);
         }}
       />
-      <TablePagination
-        rowsPerPageOptions={[5, 10, 25]}
-        component="div"
-        count={totalElements}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={(_, newPage) => setPage(newPage)}
-        onRowsPerPageChange={(event) => {
-          setRowsPerPage(parseInt(event.target.value, 20));
-          setPage(0); // Reset to first page when rows per page changes
-        }}
-      />
-
       <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="sm">
         <DialogTitle>{currentGroup ? 'Edit Group' : 'Add Group'}</DialogTitle>
         <DialogContent>
