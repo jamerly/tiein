@@ -13,10 +13,13 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.io.entity.StringEntity;
+import ai.jamerly.tiein.entity.Group; // Import Group
+import ai.jamerly.tiein.repository.GroupRepository; // Import GroupRepository
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.util.List;
@@ -29,11 +32,20 @@ public class MCPToolService {
     @Autowired
     private MCPToolRepository mcpToolRepository;
 
+    @Autowired // Inject GroupRepository
+    private GroupRepository groupRepository;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // CRUD Operations
     public Page<MCPTool> getAllTools(Pageable pageable) {
-        return mcpToolRepository.findAll(pageable);
+        Page<MCPTool> mcpTools =mcpToolRepository.findAll(pageable);
+        mcpTools.getContent().forEach(t->{
+            t.setGroup(
+                    groupRepository.findById(t.getGroupId()).orElse(null)
+            );
+        });
+        return mcpTools;
     }
 
     public Optional<MCPTool> getToolById(Long id) {
@@ -44,10 +56,19 @@ public class MCPToolService {
         return mcpToolRepository.findByName(name);
     }
 
+    @Transactional
     public MCPTool createTool(MCPTool tool) {
+        if (tool.getGroupId() != null) {
+            Group group = groupRepository.findById(tool.getGroupId())
+                    .orElseThrow(() -> new RuntimeException("Group not found with ID: " + tool.getGroupId()));
+            tool.setGroupId(group.getId());
+        } else {
+            tool.setGroupId(null); // Ensure no group is set if groupId is null
+        }
         return mcpToolRepository.save(tool);
     }
 
+    @Transactional
     public MCPTool updateTool(Long id, MCPTool updatedTool) {
         return mcpToolRepository.findById(id)
                 .map(tool -> {
@@ -57,6 +78,7 @@ public class MCPToolService {
                     tool.setHttpUrl(updatedTool.getHttpUrl());
                     tool.setHttpHeaders(updatedTool.getHttpHeaders());
                     tool.setHttpBody(updatedTool.getHttpBody());
+                    tool.setGroupId(updatedTool.getGroupId());
                     tool.setGroovyScript(updatedTool.getGroovyScript());
                     tool.setDescription(updatedTool.getDescription());
                     tool.setInputSchemaJson(updatedTool.getInputSchemaJson());

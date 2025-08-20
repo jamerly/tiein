@@ -17,6 +17,8 @@ public class MCPTool {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private ToolType type;
+    // Transient fields to match frontend DTO, will not be persisted
+    private Long groupId;
 
     // For HTTP tools
     private String httpMethod;
@@ -39,6 +41,8 @@ public class MCPTool {
     @Column(columnDefinition = "TEXT")
     private String outputSchemaJson;
 
+    @Transient
+    private Group group;
     // New field for proxy
     private Boolean isProxy; // Indicates if the tool requires proxy requests
 

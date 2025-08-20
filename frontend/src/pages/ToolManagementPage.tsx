@@ -28,37 +28,11 @@ import {
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, InfoOutlined as InfoOutlinedIcon } from '@mui/icons-material';
 import api,{HttpService} from '../services/api';
-import type { PagableResponse } from '../services/api';
 import { fetchGroups } from '../services/group';
 import { v4 as uuidv4 } from 'uuid';
-interface Tool {
-  id: number;
-  name: string;
-  type: 'HTTP' | 'GROOVY';
-  httpMethod?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  httpUrl?: string;
-  httpHeaders?: string;
-  httpBody?: string;
-  groovyScript?: string;
-  description?: string;
-  inputSchemaJson?: string;
-  outputSchemaJson?: string;
-  isProxy?: boolean; // Added isProxy field
-  groupId?: number; // New: Group ID
-  groupName?: string; // New: Group Name
-}
+import type { Tool, ToolsResponse, Parameter } from '../services/tools';
+import { fetchTools,createTool,updateTool,deleteTool } from '../services/tools';
 
-interface ToolsResponse extends PagableResponse<Tool> {}
-
-interface Parameter {
-  id: string; // Unique ID for React key
-  name: string;
-  type: 'string' | 'integer' | 'boolean' | 'array' | 'object';
-  description: string;
-  required: boolean;
-  defaultValue?: string | number | boolean;
-  enum?: string; // Stored as comma-separated string for simplicity in TextField
-}
 
 const ToolManagementPage: React.FC = () => {
   const [tools, setTools] = useState<Tool[]>([]);
@@ -76,7 +50,7 @@ const ToolManagementPage: React.FC = () => {
   
   const [name, setName] = useState('');
   const [type, setType] = useState<'HTTP' | 'GROOVY'>('HTTP');
-  const [groupName, setGroupName] = useState(''); // New state for group name
+  const [selectedGroupId, setSelectedGroupId] = useState<number | undefined>(undefined); // New state for selected group ID
   const [httpMethod, setHttpMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('GET');
   const [httpUrl, setHttpUrl] = useState('');
   const [httpHeadersKv, setHttpHeadersKv] = useState<Array<{ key: string; value: string }>>([]);
@@ -266,11 +240,11 @@ const ToolManagementPage: React.FC = () => {
     }
   };
 
-  const fetchTools = async (pageNumber: number, pageSize: number) => {
+  const _fetchTools = async (pageNumber: number, pageSize: number) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await HttpService.get<ToolsResponse>(`/mcp/tools?page=${pageNumber}&size=${pageSize}`);
+      const response = await fetchTools(pageNumber, pageSize);
       setTools(response.content || []);
       setTotalElements(response.totalElements  || 0);
       setPage(response.number); // Update page state based on actual response page number
@@ -283,7 +257,7 @@ const ToolManagementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchTools(page, rowsPerPage);
+    _fetchTools(page, rowsPerPage);
   }, [page, rowsPerPage]);
 
   const fetchAvailableGroups = async () => {
@@ -324,10 +298,7 @@ const ToolManagementPage: React.FC = () => {
     setGroovyScript(tool && tool.groovyScript ? tool.groovyScript : '');
     setDescription(tool ? tool.description : '');
     // Set group name based on tool.groupId
-    const initialGroupName = tool?.groupId
-      ? availableGroups.find(g => g.id === tool.groupId)?.name || ''
-      : '';
-    setGroupName(initialGroupName);
+    setSelectedGroupId(tool?.groupId);
     setInputParameters(jsonSchemaToParameters(tool?.inputSchemaJson));
     setOutputParameters(jsonSchemaToParameters(tool?.outputSchemaJson));
     setInputSchemaJsonRaw(tool?.inputSchemaJson || '');
@@ -350,7 +321,7 @@ const ToolManagementPage: React.FC = () => {
     setHttpBody('');
     setGroovyScript('');
     setDescription('');
-    setGroupName(''); // Clear group name
+    setSelectedGroupId(undefined); // Clear selected group ID
     setInputParameters([{ id: uuidv4(), name: '', type: 'string', description: '', required: false, enum: '' }]);
     setOutputParameters([{ id: uuidv4(), name: '', type: 'string', description: '', required: false, enum: '' }]);
     setInputSchemaJsonRaw('');
@@ -403,8 +374,8 @@ const ToolManagementPage: React.FC = () => {
       const finalHttpHeaders = Object.keys(headersObject).length > 0 ? JSON.stringify(headersObject) : undefined;
 
       // Find the selected group's ID from availableGroups
-      const selectedGroup = availableGroups.find(group => group.name === groupName);
-      const finalGroupId = selectedGroup ? selectedGroup.id : undefined;
+      const finalGroupId = selectedGroupId; // Directly use selectedGroupId
+      const finalGroupName = availableGroups.find(g => g.id === selectedGroupId)?.name || ''; // Derive groupName from selectedGroupId
 
       const toolData = {
         name, type, description, 
@@ -417,15 +388,14 @@ const ToolManagementPage: React.FC = () => {
         groovyScript: type === 'GROOVY' ? groovyScript : undefined,
         isProxy: isProxy, // Include isProxy in toolData
         groupId: finalGroupId, // Include groupId
-        groupName: groupName, // Include groupName
-      };
+      } as Tool;
 
       if (currentTool) {
         // Update tool
-        await api.put(`/mcp/tools/${currentTool.id}`, { id: currentTool.id, ...toolData });
+        await updateTool(currentTool.id, toolData );
       } else {
         // Create tool
-        await api.post('/mcp/tools', toolData);
+        await createTool(toolData);
       }
       setPage(0); // Reset to first page after add/update
       fetchTools(0, rowsPerPage);
@@ -439,7 +409,7 @@ const ToolManagementPage: React.FC = () => {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this tool?')) {
       try {
-        await api.delete(`/mcp/tools/${id}`);
+        await deleteTool(id); // Use new deleteTool function
         setPage(0); // Reset to first page after delete
         fetchTools(0, rowsPerPage);
       } catch (err: unknown) {
@@ -498,7 +468,7 @@ const ToolManagementPage: React.FC = () => {
                   {tool.id}
                 </TableCell>
                 <TableCell>{tool.name}</TableCell>
-                <TableCell>{tool.groupName || 'N/A'}</TableCell>
+                <TableCell>{tool.group?.name || 'N/A'}</TableCell>
                 <TableCell>{tool.httpUrl || 'N/A'}</TableCell>
                 <TableCell>{tool.isProxy ? 'Yes' : 'No'}</TableCell>
                 <TableCell align="right">
@@ -550,12 +520,12 @@ const ToolManagementPage: React.FC = () => {
             select
             fullWidth
             variant="standard"
-            value={groupName}
-            onChange={(e) => setGroupName(e.target.value)}
+            value={selectedGroupId || ''} // Use selectedGroupId, default to empty string
+            onChange={(e) => setSelectedGroupId(e.target.value ? Number(e.target.value) : undefined)} // Convert to number or undefined
             sx={{ mb: 2 }}
           >
             {availableGroups.map((group) => (
-              <MenuItem key={group.id} value={group.name}>
+              <MenuItem key={group.id} value={group.id}> {/* Use group.id as value */}
                 {group.name}
               </MenuItem>
             ))}
