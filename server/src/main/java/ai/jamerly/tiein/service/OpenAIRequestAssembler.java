@@ -88,11 +88,9 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
 
     @Override
     public Flux<String> invoke(AIRequest request) {
-
         List<Map<String, Object>> newHistoricalMessages = request.getHistoricalMessages() == null ?
-                new ArrayList<>(): new ArrayList<>(request.getHistoricalMessages());
-        if( newHistoricalMessages.size() < 1 ){
-            newHistoricalMessages = new ArrayList<>();
+                new ArrayList<>() : new ArrayList<>(request.getHistoricalMessages());
+        if (newHistoricalMessages.isEmpty()) {
             Map<String, Object> currentUserMessage = new HashMap<>();
             currentUserMessage.put("role", "user");
             currentUserMessage.put("content", request.getPrompt());
@@ -100,117 +98,106 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
         }
         request.setHistoricalMessages(newHistoricalMessages);
 
-        // This will store the accumulated tool calls from the stream
-        // Key: tool_call.id, Value: complete tool_call object (JSONObject)
-        Map<String, JSONObject> accumulatedToolCallsMap = new HashMap<>();
-        StringBuilder accumulatedContent = new StringBuilder();
-
         return super.invoke(request)
-                .doOnError(HttpClientErrorException.class, httpClientErrorException -> {
-                    if (httpClientErrorException.getMessage().contains("429 Too Many Requests")) {
-                        log.warn("429 Too Many Requests. Consider implementing retry logic here.");
-                    } else {
-                        log.error("HTTP Client Error: {}", httpClientErrorException.getMessage());
-                    }
+                .doOnError(HttpClientErrorException.class, e -> {
+                    log.error("HTTP Client Error: {}", e.getMessage());
                 })
-                .flatMap(chunk -> {
-                    if ("[DONE]".equals(chunk.trim())) {
-                        // If it's the end of the stream, and we have accumulated tool calls,
-                        // execute them and make a follow-up OpenAI call.
-                        if (!accumulatedToolCallsMap.isEmpty()) {
-                            // Convert JSONObject values to Map<String, Object> for executeToolsAndFollowUp
-                            List<Map<String, Object>> finalToolCalls = new ArrayList<>();
-                            for (JSONObject toolCallJson : accumulatedToolCallsMap.values()) {
-                                finalToolCalls.add(toolCallJson.to(Map.class));
+                .filter(chunk -> !"[DONE]".equals(chunk.trim()))
+                .collectList()
+                .flatMapMany(chunks -> {
+                    Map<String, JSONObject> accumulatedToolCallsMap = new HashMap<>();
+                    List<String> contentChunks = new ArrayList<>();
+
+                    for (String chunk : chunks) {
+                        try {
+                            JSONObject jsonChunk = JSONObject.parseObject(chunk.substring(chunk.indexOf("{")));
+                            if (jsonChunk.containsKey("choices")) {
+                                JSONArray choices = jsonChunk.getJSONArray("choices");
+                                if (choices != null && !choices.isEmpty()) {
+                                    JSONObject firstChoice = choices.getJSONObject(0);
+                                    if (firstChoice.containsKey("delta")) {
+                                        JSONObject delta = firstChoice.getJSONObject("delta");
+
+                                        if (delta.containsKey("tool_calls")) {
+                                            JSONArray toolCallsDelta = delta.getJSONArray("tool_calls");
+                                            for (int i = 0; i < toolCallsDelta.size(); i++) {
+                                                JSONObject toolCallDelta = toolCallsDelta.getJSONObject(i);
+                                                String toolCallId = toolCallDelta.getString("id");
+
+                                                if (toolCallId != null) {
+                                                    accumulatedToolCallsMap.put(toolCallId, toolCallDelta);
+                                                } else {
+                                                    int index = toolCallDelta.getInteger("index");
+                                                    List<JSONObject> toolCallList = new ArrayList<>(accumulatedToolCallsMap.values());
+                                                    if(index < toolCallList.size()){
+                                                        JSONObject existingToolCall = toolCallList.get(index);
+                                                        if (existingToolCall != null) {
+                                                            JSONObject functionDelta = toolCallDelta.getJSONObject("function");
+                                                            if (functionDelta != null && functionDelta.containsKey("arguments")) {
+                                                                String argsChunk = functionDelta.getString("arguments");
+                                                                JSONObject existingFunction = existingToolCall.getJSONObject("function");
+                                                                String existingArgs = existingFunction.getString("arguments");
+                                                                existingFunction.put("arguments", existingArgs + argsChunk);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else if (delta.containsKey("content")) {
+                                            contentChunks.add(chunk);
+                                        }
+                                    }
+                                }
                             }
-                            return executeToolsAndFollowUp(request, finalToolCalls);
-                        } else {
-                            // If no tool calls, just return an empty Mono as content has already been emitted incrementally
-                            return Mono.empty();
+                        } catch (Exception e) {
+                            log.error("Error parsing OpenAI SSE chunk: {} - {}", chunk, e.getMessage());
                         }
                     }
+
+                    if (!accumulatedToolCallsMap.isEmpty()) {
+                        List<Map<String, Object>> finalToolCalls = new ArrayList<>();
+                        for (JSONObject toolCallJson : accumulatedToolCallsMap.values()) {
+                            finalToolCalls.add(toolCallJson.to(Map.class));
+                        }
+                        
+                        // Execute tools and make a follow-up call
+                        AIRequest followUpRequest = createFollowUpRequest(request, finalToolCalls);
+                        return super.invoke(followUpRequest)
+                                .filter(followUpChunk -> !"[DONE]".equals(followUpChunk.trim()));
+
+                    } else {
+                        return Flux.fromIterable(contentChunks);
+                    }
+                })
+                .map(chunk -> {
                     try {
-                        JSONObject jsonChunk = JSONObject.parseObject(chunk.substring(chunk.indexOf("{")));
+                        JSONObject jsonChunk = JSONObject.parseObject(chunk);
                         if (jsonChunk.containsKey("choices")) {
                             JSONArray choices = jsonChunk.getJSONArray("choices");
                             if (choices != null && !choices.isEmpty()) {
                                 JSONObject firstChoice = choices.getJSONObject(0);
                                 if (firstChoice.containsKey("delta")) {
                                     JSONObject delta = firstChoice.getJSONObject("delta");
-
-                                    // Accumulate tool calls
-                                    if (delta.containsKey("tool_calls")) {
-                                        JSONArray toolCallsDelta = delta.getJSONArray("tool_calls");
-                                        for (int i = 0; i < toolCallsDelta.size(); i++) {
-                                            JSONObject toolCallDelta = toolCallsDelta.getJSONObject(i);
-                                            String toolCallId = toolCallDelta.getString("id");
-                                            if (toolCallId == null) {
-                                                // If ID is null, it's a continuation of a previous tool call
-                                                // Find the tool call by index
-                                                int index = toolCallDelta.getInteger("index");
-                                                // This assumes tool calls are always in order and index matches list position
-                                                // A more robust solution would map by ID if available, or by index if ID is not yet present
-                                                // For now, let's assume index is reliable for merging
-                                                // This is a simplification, a real implementation might need to iterate map values
-                                                // to find the tool call by its ID if it was already assigned.
-                                                // For now, we'll rely on the fact that the first chunk for a tool call has an ID.
-                                                // If the ID is not present, it means it's a continuation of the *last* tool call added.
-                                                // This is a potential point of failure if multiple tool calls are streamed out of order.
-                                                // A better approach would be to use the `index` field provided by OpenAI.
-                                                // Let's use the `index` to merge.
-                                                // Find the tool call by its index in the accumulated map's values
-                                                JSONObject existingToolCall = null;
-                                                int currentIdx = 0;
-                                                for (JSONObject tc : accumulatedToolCallsMap.values()) {
-                                                    if (currentIdx == index) {
-                                                        existingToolCall = tc;
-                                                        break;
-                                                    }
-                                                    currentIdx++;
-                                                }
-
-                                                if (existingToolCall != null) {
-                                                    // Merge the delta into the existing tool call JSONObject
-                                                    JSONObject functionJSON = toolCallDelta.getJSONObject("function");
-                                                    if( functionJSON.containsKey("arguments") ){
-                                                        Object functionArguments = functionJSON.get("arguments");
-                                                        existingToolCall.getJSONObject("function").put("arguments",functionArguments);
-                                                    }
-//                                                    existingToolCall.putAll(toolCallDelta);
-                                                } else {
-                                                    log.warn("Could not find existing tool call to merge delta by index: {} - {}", index, toolCallDelta);
-                                                }
-                                            } else {
-                                                // New tool call, add it to the map
-                                                accumulatedToolCallsMap.put(toolCallId, toolCallDelta);
-                                            }
+                                    if (delta.containsKey("content")) {
+                                        String content = delta.getString("content");
+                                        if (content != null && !content.isEmpty()) {
+                                            return content;
                                         }
-                                    }
-
-                                    // Accumulate content
-                                    String messageContent = delta.getString("content");
-                                    if (!StringUtils.isEmpty(messageContent)) {
-                                        accumulatedContent.append(messageContent);
-                                    }
-
-                                    // If it's a tool call, we don't return content yet, we wait for [DONE]
-                                    if (!accumulatedToolCallsMap.isEmpty()) {
-                                        return Mono.empty(); // Don't emit anything yet, wait for [DONE]
-                                    } else {
-                                        return Mono.just(messageContent != null ? messageContent : "");
                                     }
                                 }
                             }
                         }
                     } catch (Exception e) {
-                        log.error("Error parsing OpenAI SSE chunk: {} - {}", chunk, e.getMessage());
+                        log.error("Error parsing or processing SSE chunk: {} - {}", chunk, e.getMessage());
                     }
-                    return Mono.empty(); // Return empty for unparseable chunks or non-content/tool-call chunks
+                    return ""; // Return empty string for non-content chunks or errors
                 })
-                .filter(content -> !content.isEmpty());
+                .filter(content -> !content.isEmpty())
+//                .map(data -> "data: " + data)
+                .concatWith(Flux.just("[DONE]"));
     }
 
-    private Flux<String> executeToolsAndFollowUp(AIRequest originalRequest, List<Map<String, Object>> toolCalls) {
+    private AIRequest createFollowUpRequest(AIRequest originalRequest, List<Map<String, Object>> toolCalls) {
         List<Map<String, Object>> nextHistoricalMessages = new ArrayList<>(originalRequest.getHistoricalMessages());
 
         // Add the AI's tool_calls message to history
@@ -222,15 +209,14 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
         // Execute tools and add tool_results to history
         for (Map<String, Object> toolCall : toolCalls) {
             String toolId = (String) toolCall.get("id");
-            String toolType = (String) toolCall.get("type"); // Should be "function"
             Map<String, Object> function = (Map<String, Object>) toolCall.get("function");
             String toolName = (String) function.get("name");
-            String argumentsJsonString = (String) function.get("arguments"); // Get arguments as String
+            String argumentsJsonString = (String) function.get("arguments");
             Map<String, Object> arguments;
             if (argumentsJsonString == null || argumentsJsonString.isEmpty()) {
-                arguments = Collections.emptyMap(); // Return empty map if arguments string is null or empty
+                arguments = Collections.emptyMap();
             } else {
-                arguments = JSONObject.parseObject(argumentsJsonString).to(Map.class); // Parse arguments String to Map
+                arguments = JSONObject.parseObject(argumentsJsonString).to(Map.class);
             }
 
             Long realToolId = Long.parseLong(toolName.split("_")[1]);
@@ -246,9 +232,9 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
         // Make a follow-up OpenAI call with the updated history
         AIRequest followUpRequest = new AIRequest();
         BeanUtils.copyProperties(originalRequest, followUpRequest);
-        followUpRequest.setStream(Boolean.TRUE); // Ensure streaming for follow-up
+        followUpRequest.setStream(Boolean.TRUE);
         followUpRequest.setHistoricalMessages(nextHistoricalMessages);
 
-        return super.invoke(followUpRequest);
+        return followUpRequest;
     }
 }
