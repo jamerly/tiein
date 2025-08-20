@@ -27,9 +27,10 @@ import {
   TablePagination,
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, InfoOutlined as InfoOutlinedIcon } from '@mui/icons-material';
-import api from '../services/api';
+import api,{HttpService} from '../services/api';
+import type { PagableResponse } from '../services/api';
+import { fetchGroups } from '../services/group';
 import { v4 as uuidv4 } from 'uuid';
-
 interface Tool {
   id: number;
   name: string;
@@ -47,34 +48,7 @@ interface Tool {
   groupName?: string; // New: Group Name
 }
 
-interface ApiResponseData {
-  content: Tool[];
-  pageable: {
-    pageNumber: number;
-    pageSize: number;
-    sort: {
-      empty: boolean;
-      sorted: boolean;
-      unsorted: boolean;
-    };
-    offset: number;
-    paged: boolean;
-    unpaged: boolean;
-  };
-  last: boolean;
-  totalElements: number;
-  totalPages: number;
-  first: boolean;
-  size: number;
-  number: number;
-  sort: {
-    empty: boolean;
-    sorted: boolean;
-    unsorted: boolean;
-  };
-  numberOfElements: number;
-  empty: boolean;
-}
+interface ToolsResponse extends PagableResponse<Tool> {}
 
 interface Parameter {
   id: string; // Unique ID for React key
@@ -296,9 +270,9 @@ const ToolManagementPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<ApiResponseData>(`/mcp/tools?page=${pageNumber}&size=${pageSize}`);
-      setTools(response.content);
-      setTotalElements(response.totalElements);
+      const response = await HttpService.get<ToolsResponse>(`/mcp/tools?page=${pageNumber}&size=${pageSize}`);
+      setTools(response.content || []);
+      setTotalElements(response.totalElements  || 0);
       setPage(response.number); // Update page state based on actual response page number
     } catch (err: unknown) {
       setError((err as Error).message || 'Failed to fetch tools.');
@@ -314,8 +288,8 @@ const ToolManagementPage: React.FC = () => {
 
   const fetchAvailableGroups = async () => {
     try {
-      const response = await api.get<{ id: number; name: string }[]>('/mcp/groups');
-      setAvailableGroups(response.data);
+      const response = await fetchGroups();
+      setAvailableGroups(response.content || []);
     } catch (err) {
       console.error('Failed to fetch available groups:', err);
     }
@@ -511,7 +485,7 @@ const ToolManagementPage: React.FC = () => {
             <TableRow>
               <TableCell>ID</TableCell>
               <TableCell>Name</TableCell>
-              <TableCell>Group</TableCell> {/* New Group column */}
+              <TableCell>Group</TableCell>
               <TableCell>URL</TableCell>
               <TableCell>Proxy</TableCell>
               <TableCell align="right">Actions</TableCell>
@@ -524,7 +498,7 @@ const ToolManagementPage: React.FC = () => {
                   {tool.id}
                 </TableCell>
                 <TableCell>{tool.name}</TableCell>
-                <TableCell>{tool.groupName || 'N/A'}</TableCell> {/* Display groupName */}
+                <TableCell>{tool.groupName || 'N/A'}</TableCell>
                 <TableCell>{tool.httpUrl || 'N/A'}</TableCell>
                 <TableCell>{tool.isProxy ? 'Yes' : 'No'}</TableCell>
                 <TableCell align="right">
