@@ -249,7 +249,12 @@ public class MCPToolService {
         }
     }
 
-    public String callTool(Long toolId, Object parameters){
-        return "SUCCEED";
+    public String callTool(Long toolId, Map<String, Object> parameters){
+        ToolExecutionResult result = executeTool(toolId, parameters);
+        if (result.isSuccess()) {
+            return result.getOutput();
+        } else {
+            return "Error: " + result.getErrorMessage();
+        }
     }
 }

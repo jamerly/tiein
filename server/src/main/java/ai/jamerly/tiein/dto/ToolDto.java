@@ -23,7 +23,4 @@ public class ToolDto {
 
     private JsonNode inputSchema;
     private JsonNode outputSchema;
-
-    // Constructors (if needed, Lombok @Data should handle)
-    // Getters and Setters (if needed, Lombok @Data should handle)
 }
