@@ -3,7 +3,7 @@ package ai.jamerly.tiein.service;
 import ai.jamerly.tiein.dto.ToolExecutionResult;
 import ai.jamerly.tiein.entity.MCPTool;
 import ai.jamerly.tiein.repository.MCPToolRepository;
-import com.alibaba.fastjson2.JSONObject;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import groovy.lang.Binding;
@@ -19,15 +19,23 @@ import ai.jamerly.tiein.repository.GroupRepository; // Import GroupRepository
 import ai.jamerly.tiein.service.WorkerService; // Import WorkerService
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class MCPToolService {
 
@@ -43,12 +51,35 @@ public class MCPToolService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // CRUD Operations
-    public Page<MCPTool> getAllTools(Pageable pageable) {
-        Page<MCPTool> mcpTools = mcpToolRepository.findAll(pageable);
+    public Page<MCPTool> getAllTools(Pageable pageable, List<Long> groupIds) {
+        List<MCPTool> allTools = mcpToolRepository.findAll(); // Fetch all tools
+        List<MCPTool> filteredTools = new ArrayList<>();
+
+        if (groupIds != null && !groupIds.isEmpty()) {
+            Set<Long> filterGroupIdsSet = new HashSet<>(groupIds);
+            for (MCPTool tool : allTools) {
+                if (tool.getGroupIds() != null) {
+                    // Check if any of the tool's groupIds are in the filterGroupIdsSet
+                    boolean matches = tool.getGroupIds().stream().anyMatch(filterGroupIdsSet::contains);
+                    if (matches) {
+                        filteredTools.add(tool);
+                    }
+                }
+            }
+        } else {
+            filteredTools.addAll(allTools);
+        }
+
+        // Apply pagination manually after filtering
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), filteredTools.size());
+        List<MCPTool> pageContent = filteredTools.subList(start, end);
+
+        Page<MCPTool> mcpTools = new PageImpl<>(pageContent, pageable, filteredTools.size());
+
         mcpTools.getContent().forEach(t -> {
-            t.setGroup(
-                    groupRepository.findById(t.getGroupId()).orElse(null)
-            );
+            log.info("Processing tool: {} with workerId: {}", t.getName(), t.getWorkerId());
+            log.info("Tool {} groupIds: {}", t.getName(), t.getGroupIds());
             if (t.getWorkerId() != null) {
                 workerService.getWorkerById(t.getWorkerId()).ifPresent(workerDto -> {
                     ai.jamerly.tiein.entity.Worker workerEntity = new ai.jamerly.tiein.entity.Worker();
@@ -65,9 +96,6 @@ public class MCPToolService {
     public Optional<MCPTool> getToolById(Long id) {
         Optional<MCPTool> toolOptional = mcpToolRepository.findById(id);
         toolOptional.ifPresent(tool -> {
-            if (tool.getGroupId() != null) {
-                tool.setGroup(groupRepository.findById(tool.getGroupId()).orElse(null));
-            }
             if (tool.getWorkerId() != null) {
                 workerService.getWorkerById(tool.getWorkerId()).ifPresent(workerDto -> {
                     ai.jamerly.tiein.entity.Worker workerEntity = new ai.jamerly.tiein.entity.Worker();
@@ -86,18 +114,18 @@ public class MCPToolService {
     }
 
     public List<MCPTool> getToolsByGroupId(Long groupId) {
-        return mcpToolRepository.findByGroupId(groupId);
+        try {
+            String groupIdJson = objectMapper.writeValueAsString(groupId);
+            return mcpToolRepository.findByGroupIdsJsonContaining(groupIdJson);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+            return List.of();
+        }
     }
 
     @Transactional
     public MCPTool createTool(MCPTool tool) {
-        if (tool.getGroupId() != null) {
-            Group group = groupRepository.findById(tool.getGroupId())
-                    .orElseThrow(() -> new RuntimeException("Group not found with ID: " + tool.getGroupId()));
-            tool.setGroupId(group.getId());
-        } else {
-            tool.setGroupId(null); // Ensure no group is set if groupId is null
-        }
+        // groupIdsJson will be set by the entity's setGroupIds method
         tool.setWorkerId(tool.getWorkerId()); // Set workerId
         return mcpToolRepository.save(tool);
     }
@@ -112,13 +140,13 @@ public class MCPToolService {
                     tool.setHttpUrl(updatedTool.getHttpUrl());
                     tool.setHttpHeaders(updatedTool.getHttpHeaders());
                     tool.setHttpBody(updatedTool.getHttpBody());
-                    tool.setGroupId(updatedTool.getGroupId());
                     tool.setGroovyScript(updatedTool.getGroovyScript());
                     tool.setDescription(updatedTool.getDescription());
                     tool.setInputSchemaJson(updatedTool.getInputSchemaJson());
                     tool.setOutputSchemaJson(updatedTool.getOutputSchemaJson());
                     tool.setIsProxy(updatedTool.getIsProxy()); // Copy isProxy field
                     tool.setWorkerId(updatedTool.getWorkerId()); // Set workerId
+                    tool.setGroupIds(updatedTool.getGroupIds()); // Update groupIds
                     return mcpToolRepository.save(tool);
                 }).orElse(null);
     }
@@ -203,7 +231,7 @@ public class MCPToolService {
                     break;
                 default:
                     result.setSuccess(false);
-                    result.setErrorMessage("Unsupported HTTP method: " + tool.getHttpMethod());
+                    result.setErrorMessage("Unsupported HTTP method.");
                     return result;
             }
 

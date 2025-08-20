@@ -1,9 +1,14 @@
 package ai.jamerly.tiein.controller;
 
 import ai.jamerly.tiein.dto.ApiResponse;
+import ai.jamerly.tiein.dto.ChatMessageRequest;
+import ai.jamerly.tiein.entity.MCPChatBase;
+import ai.jamerly.tiein.entity.MCPChatHistory;
 import ai.jamerly.tiein.entity.MCPPrompt;
 import ai.jamerly.tiein.entity.MCPResource;
 import ai.jamerly.tiein.entity.MCPTool;
+import ai.jamerly.tiein.service.MCPChatBaseService;
+import ai.jamerly.tiein.service.MCPChatHistoryService;
 import ai.jamerly.tiein.service.MCPPromptService;
 import ai.jamerly.tiein.service.MCPResourceService;
 import ai.jamerly.tiein.service.MCPToolService;
@@ -11,8 +16,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -29,10 +36,16 @@ public class MCPController {
     @Autowired
     private MCPPromptService mcpPromptService;
 
+    @Autowired
+    private MCPChatBaseService mcpChatBaseService;
+
+    @Autowired
+    private MCPChatHistoryService mcpChatHistoryService;
+
     // MCPTool CRUD
     @GetMapping("/tools")
-    public ResponseEntity<ApiResponse<Page<MCPTool>>> getAllTools(Pageable pageable) {
-        Page<MCPTool> tools = mcpToolService.getAllTools(pageable);
+    public ResponseEntity<ApiResponse<Page<MCPTool>>> getAllTools(Pageable pageable, @RequestParam(required = false) List<Long> groupIds) {
+        Page<MCPTool> tools = mcpToolService.getAllTools(pageable, groupIds);
         return ResponseEntity.ok(ApiResponse.success(tools));
     }
 
@@ -81,8 +94,8 @@ public class MCPController {
 
     // MCPResource CRUD
     @GetMapping("/resources")
-    public ResponseEntity<ApiResponse<Page<MCPResource>>> getAllResources(Pageable pageable) {
-        Page<MCPResource> resources = mcpResourceService.getAllResources(pageable);
+    public ResponseEntity<ApiResponse<Page<MCPResource>>> getAllResources(Pageable pageable, @RequestParam(required = false) List<Long> groupIds) {
+        Page<MCPResource> resources = mcpResourceService.getAllResources(pageable, groupIds);
         return ResponseEntity.ok(ApiResponse.success(resources));
     }
 
@@ -117,8 +130,8 @@ public class MCPController {
 
     // MCPPrompt CRUD
     @GetMapping("/prompts")
-    public ResponseEntity<ApiResponse<Page<MCPPrompt>>> getAllPrompts(Pageable pageable) {
-        Page<MCPPrompt> prompts = mcpPromptService.getAllPrompts(pageable);
+    public ResponseEntity<ApiResponse<Page<MCPPrompt>>> getAllPrompts(Pageable pageable, @RequestParam(required = false) List<Long> groupIds) {
+        Page<MCPPrompt> prompts = mcpPromptService.getAllPrompts(pageable, groupIds);
         return ResponseEntity.ok(ApiResponse.success(prompts));
     }
 
@@ -151,6 +164,72 @@ public class MCPController {
         return ResponseEntity.ok(ApiResponse.success("Prompt deleted successfully"));
     }
 
+    // MCPChatBase CRUD
+    @GetMapping("/chatbases")
+    public ResponseEntity<ApiResponse<Page<MCPChatBase>>> getAllChatBases(Pageable pageable) {
+        Page<MCPChatBase> chatBases = mcpChatBaseService.getAllChatBases(pageable);
+        return ResponseEntity.ok(ApiResponse.success(chatBases));
+    }
+
+    @GetMapping("/chatbases/{id}")
+    public ResponseEntity<ApiResponse<MCPChatBase>> getChatBaseById(@PathVariable Long id) {
+        return mcpChatBaseService.getChatBaseById(id)
+                .map(chatBase -> ResponseEntity.ok(ApiResponse.success(chatBase)))
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(404, "ChatBase not found")));
+    }
+
+    @PostMapping("/chatbases")
+    public ResponseEntity<ApiResponse<MCPChatBase>> createChatBase(@RequestBody MCPChatBase chatBase) {
+        MCPChatBase createdChatBase = mcpChatBaseService.createChatBase(chatBase);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(createdChatBase));
+    }
+
+    @PutMapping("/chatbases/{id}")
+    public ResponseEntity<ApiResponse<MCPChatBase>> updateChatBase(@PathVariable Long id, @RequestBody MCPChatBase chatBase) {
+        MCPChatBase updatedChatBase = mcpChatBaseService.updateChatBase(id, chatBase);
+        if (updatedChatBase != null) {
+            return ResponseEntity.ok(ApiResponse.success(updatedChatBase));
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(404, "ChatBase not found"));
+        }
+    }
+
+    @DeleteMapping("/chatbases/{id}")
+    public ResponseEntity<ApiResponse<String>> deleteChatBase(@PathVariable Long id) {
+        mcpChatBaseService.deleteChatBase(id);
+        return ResponseEntity.ok(ApiResponse.success("ChatBase deleted successfully"));
+    }
+
+    @PatchMapping("/chatbases/{id}/status")
+    public ResponseEntity<ApiResponse<MCPChatBase>> updateChatBaseStatus(@PathVariable Long id, @RequestBody MCPChatBase chatBase) {
+        MCPChatBase updatedChatBase = mcpChatBaseService.updateChatBaseStatus(id, chatBase.getStatus());
+        if (updatedChatBase != null) {
+            return ResponseEntity.ok(ApiResponse.success(updatedChatBase));
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(404, "ChatBase not found"));
+        }
+    }
+
+    // MCPChatHistory
+    @GetMapping("/chat-history")
+    public ResponseEntity<ApiResponse<Page<MCPChatHistory>>> getAllChatHistory(Pageable pageable) {
+        Page<MCPChatHistory> chatHistory = mcpChatHistoryService.getChatHistory(pageable);
+        return ResponseEntity.ok(ApiResponse.success(chatHistory));
+    }
+
+    @GetMapping("/chat-history/chatbase/{chatBaseId}")
+    public ResponseEntity<ApiResponse<Page<MCPChatHistory>>> getChatHistoryByChatBaseId(@PathVariable Long chatBaseId, Pageable pageable) {
+        Page<MCPChatHistory> chatHistory = mcpChatHistoryService.getChatHistoryByChatBaseId(chatBaseId, pageable);
+        return ResponseEntity.ok(ApiResponse.success(chatHistory));
+    }
+
+    // Chat Interaction (Streaming)
+    @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> processChatMessage(@RequestBody ChatMessageRequest request) {
+        // For now, assuming userId is 1L (hardcoded for testing)
+        return mcpChatBaseService.processChatMessage(request.getChatBaseId(), 1L, request.getMessage());
+    }
+
     @GetMapping("/tools/count")
     public ResponseEntity<ApiResponse<Long>> getToolCount() {
         long count = mcpToolService.countTools();
@@ -166,6 +245,12 @@ public class MCPController {
     @GetMapping("/prompts/count")
     public ResponseEntity<ApiResponse<Long>> getPromptCount() {
         long count = mcpPromptService.countPrompts();
+        return ResponseEntity.ok(ApiResponse.success(count));
+    }
+
+    @GetMapping("/chatbases/count")
+    public ResponseEntity<ApiResponse<Long>> getChatBaseCount() {
+        long count = mcpChatBaseService.countChatBases();
         return ResponseEntity.ok(ApiResponse.success(count));
     }
 }

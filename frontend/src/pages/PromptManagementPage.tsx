@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   Typography, Box, CircularProgress, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, 
-  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert, TablePagination
+  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert, TablePagination,
+  FormControl, InputLabel, Select, MenuItem, Checkbox, ListItemText, OutlinedInput
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import type { Prompt } from '../services/prompts';
 import { fetchPrompts, createPrompt, updatePrompt, deletePrompt } from '../services/prompts';
+import { fetchGroups, type Group } from '../services/group';
 
 
 
@@ -20,11 +22,21 @@ const PromptManagementPage: React.FC = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState<Prompt | null>(null);
   
+  const [name, setName] = useState<string | undefined>('');
+  const [content, setContent] = useState<string | undefined>('');
+  const [description, setDescription] = useState<string | undefined>('');
+  const [inputSchemaJson, setInputSchemaJson] = useState<string | undefined>('');
+  const [outputSchemaJson, setOutputSchemaJson] = useState<string | undefined>('');
+  const [selectedGroups, setSelectedGroups] = useState<number[]>([]);
+  const [availableGroups, setAvailableGroups] = useState<Group[]>([]);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [filterGroupId, setFilterGroupId] = useState<number | ''>('');
+
   const loadPrompts = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetchPrompts(page, rowsPerPage);
+      const response = await fetchPrompts(page, rowsPerPage, filterGroupId === '' ? undefined : filterGroupId);
       setPrompts(response.content);
       setTotalElements(response.totalElements);
     } catch (err: unknown) {
@@ -34,21 +46,23 @@ const PromptManagementPage: React.FC = () => {
     }
   };
 
+  const loadGroups = async () => {
+    try {
+      const response = await fetchGroups();
+      setAvailableGroups(response.content);
+    } catch (error) {
+      console.error('Error fetching groups:', error);
+    }
+  };
+
   useEffect(() => {
     loadPrompts();
-  }, [page, rowsPerPage]);
-  
-  const [name, setName] = useState<string | undefined>('');
-  const [content, setContent] = useState<string | undefined>('');
-  const [description, setDescription] = useState<string | undefined>('');
-  const [inputSchemaJson, setInputSchemaJson] = useState<string | undefined>('');
-  const [outputSchemaJson, setOutputSchemaJson] = useState<string | undefined>('');
-  const [dialogError, setDialogError] = useState<string | null>(null);
+  }, [page, rowsPerPage, filterGroupId]);
 
+  useEffect(() => {
+    loadGroups();
+  }, []);
   
-
-  
-
   const handleOpenDialog = (prompt: Prompt | null = null) => {
     setCurrentPrompt(prompt);
     setName(prompt?.name || '');
@@ -56,6 +70,7 @@ const PromptManagementPage: React.FC = () => {
     setDescription(prompt?.description || '');
     setInputSchemaJson(prompt?.inputSchemaJson || '');
     setOutputSchemaJson(prompt?.outputSchemaJson || '');
+    setSelectedGroups(prompt?.groupIds || []);
     setDialogError(null);
     setOpenDialog(true);
   };
@@ -68,14 +83,24 @@ const PromptManagementPage: React.FC = () => {
     setDescription('');
     setInputSchemaJson('');
     setOutputSchemaJson('');
+    setSelectedGroups([]);
     setDialogError(null);
+  };
+
+  const handleGroupChange = (event: any) => {
+    const {
+      target: { value },
+    } = event;
+    setSelectedGroups(
+      typeof value === 'string' ? value.split(',').map(Number) : value,
+    );
   };
 
   const handleSubmit = async () => {
     setDialogError(null);
     try {
       const promptData = {
-        name, content, description, inputSchemaJson, outputSchemaJson
+        name, content, description, inputSchemaJson, outputSchemaJson, groupIds: selectedGroups
       };
 
       if (currentPrompt) {
@@ -127,14 +152,35 @@ const PromptManagementPage: React.FC = () => {
       <Typography variant="h4" gutterBottom>
         Prompt Management
       </Typography>
-      <Button 
-        variant="contained" 
-        startIcon={<AddIcon />} 
-        onClick={() => handleOpenDialog()} 
-        sx={{ mb: 2 }}
-      >
-        Add Prompt
-      </Button>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Button 
+          variant="contained" 
+          startIcon={<AddIcon />} 
+          onClick={() => handleOpenDialog()} 
+        >
+          Add Prompt
+        </Button>
+        <FormControl sx={{ minWidth: 200 }}>
+          <InputLabel id="filter-group-label">Filter by Group</InputLabel>
+          <Select
+            labelId="filter-group-label"
+            id="filter-group"
+            value={filterGroupId}
+            label="Filter by Group"
+            onChange={(e) => {
+              setFilterGroupId(e.target.value as number | '');
+              setPage(0); // Reset page when filter changes
+            }}
+          >
+            <MenuItem value=""><em>All Groups</em></MenuItem>
+            {availableGroups.map((group) => (
+              <MenuItem key={group.id} value={group.id}>
+                {group.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
       <TableContainer component={Paper}>
         <Table sx={{ minWidth: 650 }} aria-label="prompt table">
           <TableHead>
@@ -142,6 +188,7 @@ const PromptManagementPage: React.FC = () => {
               <TableCell>ID</TableCell>
               <TableCell>Name</TableCell>
               <TableCell>Description</TableCell>
+              <TableCell>Groups</TableCell> {/* New column */}
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -153,6 +200,9 @@ const PromptManagementPage: React.FC = () => {
                 </TableCell>
                 <TableCell>{prompt.name}</TableCell>
                 <TableCell>{prompt.description || 'N/A'}</TableCell>
+                <TableCell>
+                  {(prompt.groupIds || []).map(id => availableGroups.find(g => g.id === id)?.name).filter(Boolean).join(', ')}
+                </TableCell>
                 <TableCell align="right">
                   <IconButton aria-label="edit" onClick={() => handleOpenDialog(prompt)}>
                     <EditIcon />
@@ -248,6 +298,30 @@ const PromptManagementPage: React.FC = () => {
             onChange={(e) => setOutputSchemaJson(e.target.value)}
             sx={{ mb: 2 }}
           />
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel id="select-groups-label">Groups</InputLabel>
+            <Select
+              labelId="select-groups-label"
+              id="select-groups"
+              multiple
+              value={selectedGroups}
+              onChange={handleGroupChange}
+              input={<OutlinedInput label="Groups" />}
+              renderValue={(selected) => {
+                const selectedNames = availableGroups
+                  .filter(group => selected.includes(group.id))
+                  .map(group => group.name);
+                return selectedNames.join(', ');
+              }}
+            >
+              {availableGroups.map((group) => (
+                <MenuItem key={group.id} value={group.id}>
+                  <Checkbox checked={selectedGroups.indexOf(group.id) > -1} />
+                  <ListItemText primary={group.name} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>

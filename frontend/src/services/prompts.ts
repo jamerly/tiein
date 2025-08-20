@@ -7,10 +7,15 @@ export interface Prompt {
   description?: string;
   inputSchemaJson?: string;
   outputSchemaJson?: string;
+  groupIds: number[]; // Added groupIds
 }
 
-export const fetchPrompts = async (page: number, pageSize: number): Promise<PagableResponse<Prompt>> => {
-  const response = await HttpService.getPagable<Prompt>('/mcp/prompts', page, pageSize);
+export const fetchPrompts = async (page: number, pageSize: number, groupId?: number): Promise<PagableResponse<Prompt>> => {
+  let url = '/mcp/prompts';
+  if (groupId !== undefined) {
+    url += `?groupId=${groupId}`;
+  }
+  const response = await HttpService.getPagable<Prompt>(url, page, pageSize);
   return response;
 };
 

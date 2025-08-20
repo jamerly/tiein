@@ -27,6 +27,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -34,9 +35,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @Component
 public class MCPWebSocketHandler extends TextWebSocketHandler {
@@ -247,7 +246,8 @@ public class MCPWebSocketHandler extends TextWebSocketHandler {
         Integer page = 1;
         while(Boolean.TRUE){
             Page<MCPTool> mcpTools = mcpToolService.getAllTools(
-                    PageRequest.of(page++,100)
+                    PageRequest.of(page++,100),
+                    List.of()
             );
             for (MCPTool mcpTool : mcpTools.getContent()) {
                 ToolDto toolDto = new ToolDto();
@@ -276,7 +276,8 @@ public class MCPWebSocketHandler extends TextWebSocketHandler {
     private void handleResourcesList(WebSocketSession session, JsonNode idNode, JsonNode paramsNode) throws IOException {
         try {
             Page<MCPResource> mcpResources = mcpResourceService.getAllResources(
-                    PageRequest.of(0,1000, Sort.by("id").descending())
+                    PageRequest.of(0,1000, Sort.by("id").descending()),
+                    Collections.emptyList()
             );
             ArrayNode resourcesArray = objectMapper.createArrayNode();
 
@@ -327,7 +328,7 @@ public class MCPWebSocketHandler extends TextWebSocketHandler {
     private void handlePromptsList(WebSocketSession session, JsonNode idNode, JsonNode paramsNode) throws IOException {
         try {
             Page<MCPPrompt> mcpPrompts = mcpPromptService.getAllPrompts(
-                    PageRequest.of(0,1000)
+                    PageRequest.of(0,1000),List.of()
             );
             ArrayNode promptsArray = objectMapper.createArrayNode();
 

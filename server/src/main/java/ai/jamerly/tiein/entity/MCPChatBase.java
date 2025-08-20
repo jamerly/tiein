@@ -4,39 +4,51 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
-import java.util.ArrayList;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.ArrayList;
 
 @Data
 @Entity
-@Table(name = "mcp_prompts")
-public class MCPPrompt {
+@Table(name = "mcp_chatbase")
+public class MCPChatBase {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String name;
 
-    @Column(columnDefinition = "TEXT")
-    private String content;
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String rolePrompt;
 
-    @Column(columnDefinition = "TEXT")
-    private String description;
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private Status status = Status.ACTIVE; // Default status
 
-    @Column(columnDefinition = "TEXT")
-    private String inputSchemaJson;
-
-    @Column(columnDefinition = "TEXT")
-    private String outputSchemaJson;
-
-    @Column(columnDefinition = "TEXT")
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String groupIdsJson; // Storing group IDs as a JSON string
 
     @Transient // This field will not be persisted in the database
     private List<Long> groupIds;
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+
+    public enum Status {
+        ACTIVE,
+        INACTIVE
+    }
 
     // Custom getter for groupIds to convert from JSON string
     public List<Long> getGroupIds() {

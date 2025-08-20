@@ -55,6 +55,7 @@ public class SecurityConfig {
                         "/user/login",
                         "/mcp-server/status/initialized",
                         "/chat/openai",
+                        "/mcp/chat",
                         "/mcp-server/health", // Health check should be public
                         "/mcp-server/info" // Server info should be public
                 ).permitAll() // Allow registration, login, and public info without authentication

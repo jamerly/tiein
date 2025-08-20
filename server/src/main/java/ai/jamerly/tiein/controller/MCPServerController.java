@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.lang.management.ManagementFactory;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,7 +85,8 @@ public class MCPServerController {
                                         pageerDto.getPage(),
                                         pageerDto.getPageSize(),
                                         Sort.by("id").descending()
-                                )
+                                ),
+                                Collections.emptyList() // Pass an empty list for groupIds
                         )
                 )
         );

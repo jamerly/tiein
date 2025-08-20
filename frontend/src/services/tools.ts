@@ -16,14 +16,12 @@ export interface Tool {
   httpUrl?: string;
   httpHeaders?: string;
   httpBody?: string;
-  group?: Group; // Use Group type for group
   groovyScript?: string;
   description?: string | undefined;
   inputSchemaJson?: string;
   outputSchemaJson?: string;
   isProxy?: boolean;
-  groupId?: number;
-  groupName?: string;
+  groupIds: number[]; // Changed from groupId and groupName
   workerId?: number;
 }
 
@@ -39,17 +37,28 @@ export interface Parameter {
   enum?: string;
 }
 
-export const fetchTools = async (pageNumber: number, pageSize: number): Promise<ToolsResponse> => {
-  const response = await HttpService.getPagable<Tool>(`/mcp/tools`, pageNumber, pageSize);
+export const fetchTools = async (pageNumber: number, pageSize: number, groupIds?: number[]): Promise<ToolsResponse> => {
+  let url = '/mcp/tools';
+  const params = new URLSearchParams();
+
+  if (groupIds && groupIds.length > 0) {
+    groupIds.forEach(id => params.append('groupIds', id.toString())); // Append each ID as a separate parameter
+  }
+
+  if (params.toString()) {
+    url += `?${params.toString()}`;
+  }
+
+  const response = await HttpService.getPagable<Tool>(url, pageNumber, pageSize);
   return response;
 };
 
-export const createTool = async (toolData: Omit<Tool, 'id' | 'groupName'>): Promise<Tool> => {
+export const createTool = async (toolData: Omit<Tool, 'id'>): Promise<Tool> => {
   const response = await HttpService.post<Tool>('/mcp/tools', toolData);
   return response;
 };
 
-export const updateTool = async (id: number, toolData: Omit<Tool, 'id' | 'groupName'>): Promise<Tool> => {
+export const updateTool = async (id: number, toolData: Tool): Promise<Tool> => {
   const response = await HttpService.put<Tool>(`/mcp/tools/${id}`, toolData);
   return response;
 };
@@ -131,10 +140,5 @@ export const parametersToJsonSchema = (parameters: Parameter[]): string | undefi
 
 export const fetchToolById = async (id: number): Promise<Tool> => {
   const response = await HttpService.get<Tool>(`/mcp/tools/${id}`);
-  return response;
-};
-
-export const fetchToolsByGroupId = async (groupId: number): Promise<Tool[]> => {
-  const response = await HttpService.get<Tool[]>(`/mcp/tools/by-group/${groupId}`);
   return response;
 };

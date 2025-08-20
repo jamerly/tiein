@@ -41,6 +41,9 @@ public class WorkerService {
     }
 
     public Optional<WorkerDto> getWorkerById(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
         return workerRepository.findById(id).map(this::convertToDto);
     }
 

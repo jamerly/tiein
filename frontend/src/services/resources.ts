@@ -6,10 +6,22 @@ export interface Resource {
   content: string;
   contentType: string;
   description?: string;
+  groupIds: number[]; // Added groupIds
 }
 
-export const fetchResources = async (page: number, pageSize: number): Promise<PagableResponse<Resource>> => {
-  const response = await HttpService.getPagable<Resource>('/mcp/resources', page, pageSize);
+export const fetchResources = async (page: number, pageSize: number, groupIds?: number[]): Promise<PagableResponse<Resource>> => {
+  let url = '/mcp/resources';
+  const params = new URLSearchParams();
+
+  if (groupIds && groupIds.length > 0) {
+    groupIds.forEach(id => params.append('groupIds', id.toString())); // Append each ID as a separate parameter
+  }
+
+  if (params.toString()) {
+    url += `?${params.toString()}`;
+  }
+
+  const response = await HttpService.getPagable<Resource>(url, page, pageSize);
   return response;
 };
 

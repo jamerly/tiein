@@ -8,15 +8,14 @@ import {
   MenuItem,
   FormControlLabel,
   Switch,
-
+  FormControl, InputLabel, Select, Checkbox, ListItemText, OutlinedInput
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, InfoOutlined as InfoOutlinedIcon } from '@mui/icons-material';
-import { Checkbox } from '@mui/material';
-import { fetchGroups } from '../services/group';
 import { v4 as uuidv4 } from 'uuid';
 import type { Tool, Parameter } from '../services/tools';
 import { fetchTools,createTool,updateTool,deleteTool } from '../services/tools';
 import workerService, { type Worker } from '../services/worker';
+import { fetchGroups, type Group } from '../services/group';
 
 
 const ToolManagementPage: React.FC = () => {
@@ -31,14 +30,14 @@ const ToolManagementPage: React.FC = () => {
   
   
 
-  const [availableGroups, setAvailableGroups] = useState<{ id: number; name: string }[]>([]); // New state for available groups
+  const [availableGroups, setAvailableGroups] = useState<Group[]>([]); // New state for available groups
   const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]); // New state for available workers
   const [selectedWorkerId, setSelectedWorkerId] = useState<number | undefined>(undefined); // New state for selected worker ID
   const [loadingWorkers, setLoadingWorkers] = useState(false); // New state for loading workers
   
   const [name, setName] = useState('');
   const [type, setType] = useState<'HTTP' | 'GROOVY'>('HTTP');
-  const [selectedGroupId, setSelectedGroupId] = useState<number | undefined>(undefined); // New state for selected group ID
+  const [selectedGroups, setSelectedGroups] = useState<number[]>([]); // Changed to selectedGroups
   const [httpMethod, setHttpMethod] = useState<'GET' | 'POST' | 'PUT' | 'DELETE'>('GET');
   const [httpUrl, setHttpUrl] = useState('');
   const [httpHeadersKv, setHttpHeadersKv] = useState<Array<{ key: string; value: string }>>([]);
@@ -59,6 +58,7 @@ const ToolManagementPage: React.FC = () => {
   const [helpDialogContent, setHelpDialogContent] = useState('');
 
   const [isProxy, setIsProxy] = useState(false); // State for isProxy
+  const [filterGroupId, setFilterGroupId] = useState<number | ''>(''); // New state for filter
 
   // Helper to convert JSON Schema to Parameter[]
   const jsonSchemaToParameters = (schemaJson?: string): Parameter[] => {
@@ -228,11 +228,15 @@ const ToolManagementPage: React.FC = () => {
     }
   };
 
-  const _fetchTools = async (pageNumber: number, pageSize: number) => {
+  const _fetchTools = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetchTools(pageNumber, pageSize);
+      const response = await fetchTools(
+        page, 
+        rowsPerPage, 
+        filterGroupId === '' ? undefined : [filterGroupId] // Pass as a list
+      );
       setTools(response.content || []);
       setTotalElements(response.totalElements  || 0);
       setPage(response.number); // Update page state based on actual response page number
@@ -267,8 +271,8 @@ const ToolManagementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    _fetchTools(page, rowsPerPage);
-  }, [page, rowsPerPage]);
+    _fetchTools();
+  }, [page, rowsPerPage, filterGroupId]);
 
   useEffect(() => {
     fetchAvailableGroups();
@@ -299,8 +303,8 @@ const ToolManagementPage: React.FC = () => {
     setHttpBody(tool && tool.httpBody ? tool.httpBody : '');
     setGroovyScript(tool && tool.groovyScript ? tool.groovyScript : '');
     setDescription(tool?.description ?? '');
-    // Set group name based on tool.groupId
-    setSelectedGroupId(tool?.groupId);
+    // Set selected groups
+    setSelectedGroups(tool?.groupIds || []);
     // Set selected worker ID
     setSelectedWorkerId(tool?.workerId);
     setInputParameters(jsonSchemaToParameters(tool?.inputSchemaJson));
@@ -325,7 +329,7 @@ const ToolManagementPage: React.FC = () => {
     setHttpBody('');
     setGroovyScript('');
     setDescription('');
-    setSelectedGroupId(undefined); // Clear selected group ID
+    setSelectedGroups([]); // Clear selected groups
     setInputParameters([{ id: uuidv4(), name: '', type: 'string', description: '', required: false, enum: '' }]);
     setOutputParameters([{ id: uuidv4(), name: '', type: 'string', description: '', required: false, enum: '' }]);
     setInputSchemaJsonRaw('');
@@ -335,6 +339,15 @@ const ToolManagementPage: React.FC = () => {
     setIsProxy(false); // Clear isProxy state
     setSelectedWorkerId(undefined); // Clear selected worker ID
     setDialogError(null);
+  };
+
+  const handleGroupChange = (event: any) => {
+    const {
+      target: { value },
+    } = event;
+    setSelectedGroups(
+      typeof value === 'string' ? value.split(',').map(Number) : value,
+    );
   };
 
   const handleSubmit = async () => {
@@ -378,9 +391,6 @@ const ToolManagementPage: React.FC = () => {
       }, {} as Record<string, string>);
       const finalHttpHeaders = Object.keys(headersObject).length > 0 ? JSON.stringify(headersObject) : undefined;
 
-      // Find the selected group's ID from availableGroups
-      const finalGroupId = selectedGroupId; // Directly use selectedGroupId
-
       const toolData = {
         name, type, description, 
         inputSchemaJson: finalInputSchemaJson,
@@ -391,7 +401,7 @@ const ToolManagementPage: React.FC = () => {
         httpBody: type === 'HTTP' ? httpBody : undefined,
         groovyScript: type === 'GROOVY' ? groovyScript : undefined,
         isProxy: isProxy, // Include isProxy in toolData
-        groupId: finalGroupId, // Include groupId
+        groupIds: selectedGroups, // Include groupIds
         workerId: type === 'GROOVY' ? selectedWorkerId : undefined, // Include workerId if type is GROOVY
       } as Tool;
 
@@ -403,7 +413,7 @@ const ToolManagementPage: React.FC = () => {
         await createTool(toolData);
       }
       setPage(0); // Reset to first page after add/update
-      _fetchTools(page, rowsPerPage);
+      _fetchTools();
       handleCloseDialog();
     } catch (err: unknown) {
       setDialogError((err as Error).message || 'Operation failed.');
@@ -416,7 +426,7 @@ const ToolManagementPage: React.FC = () => {
       try {
         await deleteTool(id); // Use new deleteTool function
         setPage(0); // Reset to first page after delete
-        _fetchTools(page, rowsPerPage);
+        _fetchTools();
       } catch (err: unknown) {
         setError((err as Error).message || 'Failed to delete tool.');
         console.error('Delete tool error:', err);
@@ -446,22 +456,43 @@ const ToolManagementPage: React.FC = () => {
       <Typography variant="h4" gutterBottom>
         Tool Management
       </Typography>
-      <Button 
-        variant="contained" 
-        startIcon={<AddIcon />} 
-        onClick={() => handleOpenDialog()} 
-        sx={{ mb: 2 }}
-      >
-        Add Tool
-      </Button>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Button 
+          variant="contained" 
+          startIcon={<AddIcon />} 
+          onClick={() => handleOpenDialog()} 
+        >
+          Add Tool
+        </Button>
+        <FormControl sx={{ minWidth: 200 }}>
+          <InputLabel id="filter-group-label">Filter by Group</InputLabel>
+          <Select
+            labelId="filter-group-label"
+            id="filter-group"
+            value={filterGroupId}
+            label="Filter by Group"
+            onChange={(e) => {
+              setFilterGroupId(e.target.value as number | '');
+              setPage(0); // Reset page when filter changes
+            }}
+          >
+            <MenuItem value=""><em>All Groups</em></MenuItem>
+            {availableGroups.map((group) => (
+              <MenuItem key={group.id} value={group.id}>
+                {group.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
       <TableContainer component={Paper}>
         <Table sx={{ minWidth: 650, width: '100%' }} aria-label="tool table">
           <TableHead>
             <TableRow>
               <TableCell>ID</TableCell>
               <TableCell>Name</TableCell>
-              <TableCell>Group</TableCell>
-              <TableCell>URL</TableCell>
+              <TableCell>Groups</TableCell>
+              <TableCell>Type</TableCell>
               <TableCell>Proxy</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
@@ -473,8 +504,10 @@ const ToolManagementPage: React.FC = () => {
                   {tool.id}
                 </TableCell>
                 <TableCell>{tool.name}</TableCell>
-                <TableCell>{tool.group?.name || 'N/A'}</TableCell>
-                <TableCell>{tool.httpUrl || 'N/A'}</TableCell>
+                <TableCell>
+                  {(tool.groupIds || []).map(id => availableGroups.find(g => g.id === id)?.name).filter(Boolean).join(', ')}
+                </TableCell>
+                <TableCell>{tool.type}</TableCell>
                 <TableCell>{tool.isProxy ? 'Yes' : 'No'}</TableCell>
                 <TableCell align="right">
                   <IconButton aria-label="edit" onClick={() => handleOpenDialog(tool)}>
@@ -519,23 +552,30 @@ const ToolManagementPage: React.FC = () => {
             onChange={(e) => setName(e.target.value)}
             sx={{ mb: 2 }}
           />
-          <TextField
-            margin="dense"
-            id="group"
-            label="Group"
-            select
-            fullWidth
-            variant="standard"
-            value={selectedGroupId || ''} // Use selectedGroupId, default to empty string
-            onChange={(e) => setSelectedGroupId(e.target.value ? Number(e.target.value) : undefined)} // Convert to number or undefined
-            sx={{ mb: 2 }}
-          >
-            {availableGroups.map((group) => (
-              <MenuItem key={group.id} value={group.id}> {/* Use group.id as value */}
-                {group.name}
-              </MenuItem>
-            ))}
-          </TextField>
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel id="select-groups-label">Groups</InputLabel>
+            <Select
+              labelId="select-groups-label"
+              id="select-groups"
+              multiple
+              value={selectedGroups}
+              onChange={handleGroupChange}
+              input={<OutlinedInput label="Groups" />}
+              renderValue={(selected) => {
+                const selectedNames = availableGroups
+                  .filter(group => selected.includes(group.id))
+                  .map(group => group.name);
+                return selectedNames.join(', ');
+              }}
+            >
+              {availableGroups.map((group) => (
+                <MenuItem key={group.id} value={group.id}>
+                  <Checkbox checked={selectedGroups.indexOf(group.id) > -1} />
+                  <ListItemText primary={group.name} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <Box sx={{ mb: 2 , display: 'flex', flexDirection: 'row', gap: 1 }}>
             <TextField
                   margin="dense"
