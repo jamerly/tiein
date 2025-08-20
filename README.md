@@ -10,7 +10,6 @@ The project is divided into three main parts, located in their respective direct
 
 -   **`/frontend`**: A modern, responsive web application built with React and TypeScript. It provides a user-friendly interface for managing all aspects of the MCP ecosystem, including tools, prompts, resources, users, and system settings.
 -   **`/server`**: The core backend API server built with Java and Spring Boot. It handles business logic, data persistence, and serves as the central hub for all MCP interactions.
--   **`/python-sdk`**: A Python SDK for the Model Context Protocol (MCP). It allows developers to easily build and integrate their own tools and clients with any MCP-compliant server.
 
 ## Features
 
@@ -56,7 +55,6 @@ To get the full platform running, you will need to set up each component.
 
 -   [Node.js](https://nodejs.org/) and [npm](https://www.npmjs.com/) (for the frontend)
 -   [Java 21+](https://www.oracle.com/java/technologies/downloads/) and [Maven](https://maven.apache.org/) (for the server)
--   [Python 3.10+](https://www.python.org/) and a package manager like `pip` or `uv` (for the SDK)
 -   A MySQL database.
 
 ### Installation & Running
@@ -96,23 +94,6 @@ npm run dev
 
 The frontend will be available at `http://localhost:5173` (or another port if 5173 is in use).
 
-#### 3. Python SDK
-
-The Python SDK allows you to create tools that can be managed by the platform.
-
-```bash
-# Navigate to the Python SDK directory
-cd python-sdk
-
-# We recommend using a virtual environment
-python -m venv .venv
-source .venv/bin/activate
-
-# Install the SDK and its dependencies
-pip install -e ".[cli]"
-```
-
-Refer to the detailed `README.md` inside the `python-sdk` directory for instructions on how to create and run your own MCP servers.
 
 ## API Documentation
 
