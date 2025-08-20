@@ -1,5 +1,3 @@
-import { HttpService } from './api';
-
 export interface ChatMessagePayload {
   chatBaseId: number;
   message: string;

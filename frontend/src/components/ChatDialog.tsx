@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Box, Typography, Paper } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Box, Paper } from '@mui/material';
+import { Typography } from '@mui/material';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { sendChatMessage } from '../services/chat';
 
 interface ChatDialogProps {
@@ -48,25 +51,28 @@ const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chat
       let accumulatedResponse = '';
       await sendChatMessage({ chatBaseId, message: userMessageText }, (chunk) => {
         const chunks = chunk.split('\n');
-        for( var i=0;i<chunks.length;i++){
+        for( let i=0;i<chunks.length;i++){
           const currentChunk = chunks[i];
           if( currentChunk.startsWith('data:') ){
             const data = currentChunk.substring(5).trim();
+            // console.log('Received data:', data);
+            
             if (data === '[DONE]') {
               // Stream finished, save history (this part needs backend implementation)
               setLoading(false);
               return;
             }
-            accumulatedResponse += data;
-            setMessages((prevMessages) => {
-              const newMessages = [...prevMessages];
-              // Update the last AI message placeholder
-              newMessages[newMessages.length - 1] = { type: 'ai', text: accumulatedResponse };
-              return newMessages;
-            });
-          }else{
-            // console.warn('Unexpected chunk format:', currentChunk);
+            if (!data) continue; // Skip empty data
+            // Process the data chunk
+            // console.log('Received chunk:', data);
+            accumulatedResponse += JSON.parse(data.trim())["chunk"]; // Replace escaped newlines with actual newlines
           }
+        setMessages((prevMessages) => {
+            const newMessages = [...prevMessages];
+            // Update the last AI message placeholder
+            newMessages[newMessages.length - 1] = { type: 'ai', text: accumulatedResponse };
+            return newMessages;
+          });
         }
         // if (chunk === '[DONE]') {
         //   // Stream finished, save history (this part needs backend implementation)
@@ -123,7 +129,7 @@ const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chat
                   borderRadius: msg.type === 'user' ? '20px 20px 5px 20px' : '20px 20px 20px 5px',
                 }}
               >
-                <Typography variant="body2">{msg.text}</Typography>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
               </Paper>
             </Box>
           ))}

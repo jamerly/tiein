@@ -230,7 +230,11 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
                     return ""; // Return empty string for non-content chunks or errors
                 })
                 .filter(content -> !content.isEmpty())
-//                .map(data -> "data: " + data)
+                .map(data ->{
+                    JSONObject jsonObject = new JSONObject();
+                    jsonObject.put("chunk", data);
+                    return JSONObject.toJSONString(jsonObject);
+                })
                 .concatWith(Flux.just("[DONE]"));
     }
 

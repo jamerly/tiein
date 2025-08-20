@@ -36,8 +36,8 @@ const WorkerManagementPage: React.FC = () => {
   const [name, setName] = useState('');
   const [script, setScript] = useState('');
   const [dialogError, setDialogError] = useState<string | null>(null);
-  const [aiPrompt, setAiPrompt] = useState(''); // New state for AI prompt
-  const [isGenerating, setIsGenerating] = useState(false); // New state for AI generation loading
+  // const [aiPrompt, setAiPrompt] = useState(''); // New state for AI prompt
+  // const [isGenerating, setIsGenerating] = useState(false); // New state for AI generation loading
 
   // Pagination states
   const [page, setPage] = useState(0); // 0-indexed page number
@@ -70,7 +70,7 @@ const WorkerManagementPage: React.FC = () => {
     setName(worker ? worker.name : '');
     setScript(worker ? worker.script : '');
     setDialogError(null);
-    setAiPrompt(''); // Clear AI prompt on dialog open
+    // setAiPrompt(''); // Clear AI prompt on dialog open
     setOpenDialog(true);
   };
 
@@ -80,7 +80,7 @@ const WorkerManagementPage: React.FC = () => {
     setName('');
     setScript('');
     setDialogError(null);
-    setAiPrompt('');
+    // setAiPrompt('');
   };
 
   const handleSubmit = async () => {
@@ -120,23 +120,23 @@ const WorkerManagementPage: React.FC = () => {
     }
   };
 
-  const handleGenerateWithAI = async () => {
-    setDialogError(null);
-    setIsGenerating(true);
-    try {
-      if (!aiPrompt) {
-        setDialogError('Please enter a prompt for AI generation.');
-        return;
-      }
-      const generatedScript = await workerService.generateWorkerScript(aiPrompt);
-      setScript(generatedScript);
-    } catch (err: unknown) {
-      setDialogError((err as Error).message || 'Failed to generate script with AI.');
-      console.error('AI generation error:', err);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+  // const handleGenerateWithAI = async () => {
+  //   setDialogError(null);
+  //   setIsGenerating(true);
+  //   try {
+  //     if (!aiPrompt) {
+  //       setDialogError('Please enter a prompt for AI generation.');
+  //       return;
+  //     }
+  //     const generatedScript = await workerService.generateWorkerScript(aiPrompt);
+  //     setScript(generatedScript);
+  //   } catch (err: unknown) {
+  //     setDialogError((err as Error).message || 'Failed to generate script with AI.');
+  //     console.error('AI generation error:', err);
+  //   } finally {
+  //     setIsGenerating(false);
+  //   }
+  // };
 
   if (loading) {
     return (
@@ -210,19 +210,6 @@ const WorkerManagementPage: React.FC = () => {
           setPage(0);
         }}
       />
-      <TablePagination
-        rowsPerPageOptions={[5, 10, 25]}
-        component="div"
-        count={totalElements}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={(_, newPage) => setPage(newPage)}
-        onRowsPerPageChange={(event) => {
-          setRowsPerPage(parseInt(event.target.value, 10));
-          setPage(0); // Reset to first page when rows per page changes
-        }}
-      />
-
       <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="md">
         <DialogTitle>{currentWorker ? 'Edit Worker' : 'Add Worker'}</DialogTitle>
         <DialogContent>
@@ -239,7 +226,7 @@ const WorkerManagementPage: React.FC = () => {
             onChange={(e) => setName(e.target.value)}
             sx={{ mb: 2 }}
           />
-          <Box sx={{ mb: 2 }}>
+          {/* <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle1" gutterBottom>AI Prompt</Typography>
             <TextField
               margin="dense"
@@ -262,7 +249,7 @@ const WorkerManagementPage: React.FC = () => {
             >
               {isGenerating ? 'Generating...' : 'Generate with AI'}
             </Button>
-          </Box>
+          </Box> */}
           <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle1" gutterBottom>Groovy Script</Typography>
             <CodeEditor

@@ -190,7 +190,7 @@ const ResourceManagementPage: React.FC = () => {
               <TableCell>URI</TableCell>
               <TableCell>Content Type</TableCell>
               <TableCell>Description</TableCell>
-              <TableCell>Groups</TableCell> {/* New column */}
+              <TableCell>Groups</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>

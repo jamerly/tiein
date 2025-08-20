@@ -1,5 +1,4 @@
 import { HttpService } from './api';
-import { type Group } from './group';
 import type { PagableResponse } from './api';
 import { v4 as uuidv4 } from 'uuid';
 

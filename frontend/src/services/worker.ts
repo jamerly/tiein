@@ -10,7 +10,7 @@ export interface Worker {
 export interface WorkersResponse extends PagableResponse<Worker> {}
 
 const workerService = {
-  dgetAllWorkers: async (pageNumber: number, pageSize: number): Promise<WorkersResponse> => {
+  getAllWorkers: async (pageNumber: number, pageSize: number): Promise<WorkersResponse> => {
     return await HttpService.getPagable<Worker>(`/mcp/workers`, pageNumber, pageSize);
   },
 
