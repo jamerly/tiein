@@ -12,4 +12,5 @@ import java.util.Optional;
 public interface MCPResourceRepository extends JpaRepository<MCPResource, Long> {
     Optional<MCPResource> findByUri(String uri);
     Page<MCPResource> findByGroupIdsJsonContaining(String groupId, Pageable pageable);
+    Optional<MCPResource> findByName(String name);
 }

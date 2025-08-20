@@ -18,6 +18,9 @@ public class MCPResource {
     private Long id;
 
     @Column(nullable = false, unique = true)
+    private String name;
+
+    @Column(nullable = false, unique = true)
     private String uri;
 
     @Column(columnDefinition = "TEXT")

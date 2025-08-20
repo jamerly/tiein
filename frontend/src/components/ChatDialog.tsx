@@ -47,13 +47,26 @@ const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chat
     try {
       let accumulatedResponse = '';
       await sendChatMessage({ chatBaseId, message: userMessageText }, (chunk) => {
-        if (chunk === '[DONE]') {
-          // Stream finished, save history (this part needs backend implementation)
-          // For now, just mark as done
-          setLoading(false);
-          return;
+        const chunks = chunk.split('\n');
+        for( var i=0;i<chunks.length;i++){
+          const currentChunk = chunks[i];
+          if( currentChunk.startsWith('data:')){
+            const data = currentChunk.substring(5).trim();
+            if (data === '[DONE]') {
+              // Stream finished, save history (this part needs backend implementation)
+              setLoading(false);
+              return;
+            }
+            accumulatedResponse += data;
+          }
         }
-        accumulatedResponse += chunk;
+        // if (chunk === '[DONE]') {
+        //   // Stream finished, save history (this part needs backend implementation)
+        //   // For now, just mark as done
+        //   setLoading(false);
+        //   return;
+        // }
+        // accumulatedResponse += chunk;
         setMessages((prevMessages) => {
           const newMessages = [...prevMessages];
           // Update the last AI message placeholder

@@ -128,6 +128,13 @@ public class MCPController {
         return ResponseEntity.ok(ApiResponse.success("Resource deleted successfully"));
     }
 
+    @GetMapping("/resources/content_by_name")
+    public ResponseEntity<ApiResponse<String>> getResourceContentByName(@RequestParam("name") String name) {
+        return mcpResourceService.getResourceByName(name)
+                .map(resource -> ResponseEntity.ok(ApiResponse.success(resource.getContent())))
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(404, "Resource not found")));
+    }
+
     // MCPPrompt CRUD
     @GetMapping("/prompts")
     public ResponseEntity<ApiResponse<Page<MCPPrompt>>> getAllPrompts(Pageable pageable, @RequestParam(required = false) List<Long> groupIds) {

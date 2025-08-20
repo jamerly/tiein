@@ -1,6 +1,7 @@
 package ai.jamerly.tiein.service;
 
 import ai.jamerly.tiein.dto.ToolExecutionResult;
+import ai.jamerly.tiein.entity.MCPResource;
 import ai.jamerly.tiein.entity.MCPTool;
 import ai.jamerly.tiein.repository.MCPToolRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -17,6 +18,7 @@ import org.apache.hc.core5.http.io.entity.StringEntity;
 import ai.jamerly.tiein.entity.Group; // Import Group
 import ai.jamerly.tiein.repository.GroupRepository; // Import GroupRepository
 import ai.jamerly.tiein.service.WorkerService; // Import WorkerService
+import ai.jamerly.tiein.service.MCPResourceService; // Import MCPResourceService
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -47,6 +49,9 @@ public class MCPToolService {
 
     @Autowired
     private WorkerService workerService; // Inject WorkerService
+
+    @Autowired
+    private MCPResourceService mcpResourceService; // Inject MCPResourceService
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -177,6 +182,15 @@ public class MCPToolService {
                     return executeHttpTool(tool, arguments);
                 case GROOVY:
                     return executeGroovyTool(tool, arguments);
+                case INTERNAL:
+                    if ("get_resource_content".equals(tool.getName())) {
+                        return executeGetResourceContentTool(arguments);
+                    } else {
+                        ToolExecutionResult result = new ToolExecutionResult();
+                        result.setSuccess(false);
+                        result.setErrorMessage("Unknown internal tool.");
+                        return result;
+                    }
                 default:
                     ToolExecutionResult result = new ToolExecutionResult();
                     result.setSuccess(false);
@@ -303,5 +317,26 @@ public class MCPToolService {
         } else {
             return "Error: " + result.getErrorMessage();
         }
+    }
+
+    private ToolExecutionResult executeGetResourceContentTool(Map<String, Object> arguments) {
+        ToolExecutionResult result = new ToolExecutionResult();
+        if (arguments == null || !arguments.containsKey("resource_name")) {
+            result.setSuccess(false);
+            result.setErrorMessage("Missing 'resource_name' argument for get_resource_content tool.");
+            return result;
+        }
+
+        String resourceName = (String) arguments.get("resource_name");
+        Optional<MCPResource> resourceOptional = mcpResourceService.getResourceByName(resourceName);
+
+        if (resourceOptional.isPresent()) {
+            result.setSuccess(true);
+            result.setOutput(resourceOptional.get().getContent());
+        } else {
+            result.setSuccess(false);
+            result.setErrorMessage("Resource not found with name: " + resourceName);
+        }
+        return result;
     }
 }

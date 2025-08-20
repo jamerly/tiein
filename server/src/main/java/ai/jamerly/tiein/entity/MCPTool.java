@@ -61,7 +61,8 @@ public class MCPTool {
 
     public enum ToolType {
         HTTP,
-        GROOVY
+        GROOVY,
+        INTERNAL
     }
 
     // Custom getter for groupIds to convert from JSON string
