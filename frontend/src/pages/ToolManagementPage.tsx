@@ -32,6 +32,7 @@ import { fetchGroups } from '../services/group';
 import { v4 as uuidv4 } from 'uuid';
 import type { Tool, ToolsResponse, Parameter } from '../services/tools';
 import { fetchTools,createTool,updateTool,deleteTool } from '../services/tools';
+import workerService, { type Worker } from '../services/worker';
 
 
 const ToolManagementPage: React.FC = () => {
@@ -47,6 +48,9 @@ const ToolManagementPage: React.FC = () => {
   const [totalElements, setTotalElements] = useState(0);
 
   const [availableGroups, setAvailableGroups] = useState<{ id: number; name: string }[]>([]); // New state for available groups
+  const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]); // New state for available workers
+  const [selectedWorkerId, setSelectedWorkerId] = useState<number | undefined>(undefined); // New state for selected worker ID
+  const [loadingWorkers, setLoadingWorkers] = useState(false); // New state for loading workers
   
   const [name, setName] = useState('');
   const [type, setType] = useState<'HTTP' | 'GROOVY'>('HTTP');
@@ -256,10 +260,6 @@ const ToolManagementPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    _fetchTools(page, rowsPerPage);
-  }, [page, rowsPerPage]);
-
   const fetchAvailableGroups = async () => {
     try {
       const response = await fetchGroups();
@@ -269,8 +269,26 @@ const ToolManagementPage: React.FC = () => {
     }
   };
 
+  const fetchAvailableWorkers = async () => {
+    try {
+      setLoadingWorkers(true);
+      const response = await workerService.getAllWorkers(0, 1000); // Fetch all workers, assuming max 1000 for now
+      console.log('Fetched workers response:', response);
+      setAvailableWorkers(response.content || []);
+    } catch (err) {
+      console.error('Failed to fetch available workers:', err);
+    } finally {
+      setLoadingWorkers(false);
+    }
+  };
+
+  useEffect(() => {
+    _fetchTools(page, rowsPerPage);
+  }, [page, rowsPerPage]);
+
   useEffect(() => {
     fetchAvailableGroups();
+    fetchAvailableWorkers(); // Fetch available workers
   }, []);
 
   const handleOpenDialog = (tool: Tool | null = null) => {
@@ -299,6 +317,8 @@ const ToolManagementPage: React.FC = () => {
     setDescription(tool ? tool.description : '');
     // Set group name based on tool.groupId
     setSelectedGroupId(tool?.groupId);
+    // Set selected worker ID
+    setSelectedWorkerId(tool?.workerId); // Assuming tool has workerId
     setInputParameters(jsonSchemaToParameters(tool?.inputSchemaJson));
     setOutputParameters(jsonSchemaToParameters(tool?.outputSchemaJson));
     setInputSchemaJsonRaw(tool?.inputSchemaJson || '');
@@ -329,6 +349,7 @@ const ToolManagementPage: React.FC = () => {
     setInputSchemaMode('form');
     setOutputSchemaMode('form');
     setIsProxy(false); // Clear isProxy state
+    setSelectedWorkerId(undefined); // Clear selected worker ID
     setDialogError(null);
   };
 
@@ -375,7 +396,6 @@ const ToolManagementPage: React.FC = () => {
 
       // Find the selected group's ID from availableGroups
       const finalGroupId = selectedGroupId; // Directly use selectedGroupId
-      const finalGroupName = availableGroups.find(g => g.id === selectedGroupId)?.name || ''; // Derive groupName from selectedGroupId
 
       const toolData = {
         name, type, description, 
@@ -388,6 +408,7 @@ const ToolManagementPage: React.FC = () => {
         groovyScript: type === 'GROOVY' ? groovyScript : undefined,
         isProxy: isProxy, // Include isProxy in toolData
         groupId: finalGroupId, // Include groupId
+        workerId: type === 'GROOVY' ? selectedWorkerId : undefined, // Include workerId if type is GROOVY
       } as Tool;
 
       if (currentTool) {
@@ -617,6 +638,34 @@ const ToolManagementPage: React.FC = () => {
                 </Button>
               </Box>
             </>
+          )}
+          {type === 'GROOVY' && (
+            <TextField
+              margin="dense"
+              id="worker"
+              label="Worker Script"
+              select
+              fullWidth
+              variant="standard"
+              value={selectedWorkerId || ''} // Ensure value is always a number or empty string
+              onChange={(e) => setSelectedWorkerId(e.target.value ? Number(e.target.value) : undefined)}
+              sx={{ mb: 2 }}
+              SelectProps={{
+                displayEmpty: true,
+              }}
+            >
+              {loadingWorkers ? (
+                <MenuItem disabled>Loading workers...</MenuItem>
+              ) : availableWorkers.length === 0 ? (
+                <MenuItem disabled>No workers available</MenuItem>
+              ) : (
+                availableWorkers.map((worker) => (
+                  <MenuItem key={worker.id} value={worker.id}>
+                    {worker.name}
+                  </MenuItem>
+                ))
+              )}
+            </TextField>
           )}
         <Box sx={{ mb: 2 }}>
             <Typography variant="subtitle1" gutterBottom>

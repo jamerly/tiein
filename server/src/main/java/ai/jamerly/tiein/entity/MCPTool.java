@@ -1,6 +1,8 @@
 package ai.jamerly.tiein.entity;
 
 import jakarta.persistence.*;
+import ai.jamerly.tiein.entity.Group; // Import Group
+import ai.jamerly.tiein.entity.Worker; // Import Worker
 import lombok.Data;
 
 @Data
@@ -32,6 +34,8 @@ public class MCPTool {
     @Column(columnDefinition = "TEXT")
     private String groovyScript;
 
+    private Long workerId; // New field to link to Worker entity
+
     @Column(columnDefinition = "TEXT")
     private String description;
 
@@ -43,6 +47,10 @@ public class MCPTool {
 
     @Transient
     private Group group;
+
+    @Transient
+    private Worker worker; // New transient field for Worker
+
     // New field for proxy
     private Boolean isProxy; // Indicates if the tool requires proxy requests
 

@@ -2,7 +2,7 @@ import { HttpService } from './api';
 import type { PagableResponse } from './api';
 
 export interface Worker {
-  id: string;
+  id: number;
   name: string;
   script: string;
 }

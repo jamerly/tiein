@@ -15,6 +15,7 @@ import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import ai.jamerly.tiein.entity.Group; // Import Group
 import ai.jamerly.tiein.repository.GroupRepository; // Import GroupRepository
+import ai.jamerly.tiein.service.WorkerService; // Import WorkerService
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,21 +36,48 @@ public class MCPToolService {
     @Autowired // Inject GroupRepository
     private GroupRepository groupRepository;
 
+    @Autowired
+    private WorkerService workerService; // Inject WorkerService
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // CRUD Operations
     public Page<MCPTool> getAllTools(Pageable pageable) {
-        Page<MCPTool> mcpTools =mcpToolRepository.findAll(pageable);
-        mcpTools.getContent().forEach(t->{
+        Page<MCPTool> mcpTools = mcpToolRepository.findAll(pageable);
+        mcpTools.getContent().forEach(t -> {
             t.setGroup(
                     groupRepository.findById(t.getGroupId()).orElse(null)
             );
+            if (t.getWorkerId() != null) {
+                workerService.getWorkerById(t.getWorkerId()).ifPresent(workerDto -> {
+                    ai.jamerly.tiein.entity.Worker workerEntity = new ai.jamerly.tiein.entity.Worker();
+                    workerEntity.setId(workerDto.getId());
+                    workerEntity.setName(workerDto.getName());
+                    workerEntity.setScript(workerDto.getScript());
+                    t.setWorker(workerEntity);
+                });
+            }
         });
         return mcpTools;
     }
 
     public Optional<MCPTool> getToolById(Long id) {
-        return mcpToolRepository.findById(id);
+        Optional<MCPTool> toolOptional = mcpToolRepository.findById(id);
+        toolOptional.ifPresent(tool -> {
+            if (tool.getGroupId() != null) {
+                tool.setGroup(groupRepository.findById(tool.getGroupId()).orElse(null));
+            }
+            if (tool.getWorkerId() != null) {
+                workerService.getWorkerById(tool.getWorkerId()).ifPresent(workerDto -> {
+                    ai.jamerly.tiein.entity.Worker workerEntity = new ai.jamerly.tiein.entity.Worker();
+                    workerEntity.setId(workerDto.getId());
+                    workerEntity.setName(workerDto.getName());
+                    workerEntity.setScript(workerDto.getScript());
+                    tool.setWorker(workerEntity);
+                });
+            }
+        });
+        return toolOptional;
     }
 
     public Optional<MCPTool> getToolByName(String name) {
@@ -69,6 +97,7 @@ public class MCPToolService {
         } else {
             tool.setGroupId(null); // Ensure no group is set if groupId is null
         }
+        tool.setWorkerId(tool.getWorkerId()); // Set workerId
         return mcpToolRepository.save(tool);
     }
 
@@ -88,6 +117,7 @@ public class MCPToolService {
                     tool.setInputSchemaJson(updatedTool.getInputSchemaJson());
                     tool.setOutputSchemaJson(updatedTool.getOutputSchemaJson());
                     tool.setIsProxy(updatedTool.getIsProxy()); // Copy isProxy field
+                    tool.setWorkerId(updatedTool.getWorkerId()); // Set workerId
                     return mcpToolRepository.save(tool);
                 }).orElse(null);
     }
