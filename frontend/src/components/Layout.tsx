@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { ReactNode } from 'react';
-import { AppBar, Toolbar, Typography, Button, Box, List, ListItem, ListItemText, CssBaseline, Menu, MenuItem, Link } from '@mui/material';
+import { AppBar, Toolbar, Typography, Button, Box, List, ListItem, ListItemText, CssBaseline, Menu, MenuItem, Link, IconButton, Drawer, ListItemButton } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -14,7 +15,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [mobileOpen, setMobileOpen] = useState(false); // New state for mobile drawer
   const open = Boolean(anchorEl);
+
+  const handleDrawerToggle = () => { // New handler for mobile drawer
+    setMobileOpen(!mobileOpen);
+  };
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -41,10 +47,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <CssBaseline />
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            edge="start"
+            onClick={handleDrawerToggle}
+            sx={{ mr: 2, display: { sm: 'none' } }} // Only show on xs screens
+          >
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h6" noWrap component="div" sx={{  }}>
             TieIn
           </Typography>
-          <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' }, justifyContent: 'center' }}>
+          <Box sx={{ flexGrow: 1, display: { xs: 'none', sm: 'flex' }, justifyContent: 'center' }}>
             {menuItems.map((item) => (
               <Button
                 key={item.text}
@@ -65,27 +80,52 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Button>
             ))}
           </Box>
-          <Button
-            color="inherit"
-            onClick={handleMenuOpen}
-            sx={{ textTransform: 'none' }} // Prevent uppercase
-          >
-            {user?.username || 'Guest'}
-          </Button>
-          <Menu
-            anchorEl={anchorEl}
-            open={open}
-            onClose={handleMenuClose}
-            MenuListProps={{
-              'aria-labelledby': 'basic-button',
-            }}
-          >
-            <MenuItem onClick={() => { navigate('/profile'); handleMenuClose(); }}>User Profile</MenuItem>
-            <MenuItem onClick={() => { navigate('/settings'); handleMenuClose(); }}>System Settings</MenuItem>
-            <MenuItem onClick={handleLogout}>Logout</MenuItem>
-          </Menu>
+          <Box sx={{ ml: 'auto' }}> {/* New Box to push username to the right */}
+            <Button
+              color="inherit"
+              onClick={handleMenuOpen}
+              sx={{ textTransform: 'none' }} // Prevent uppercase
+            >
+              {user?.username || 'Guest'}
+            </Button>
+            <Menu
+              anchorEl={anchorEl}
+              open={open}
+              onClose={handleMenuClose}
+              MenuListProps={{
+                'aria-labelledby': 'basic-button',
+              }}
+            >
+              <MenuItem onClick={() => { navigate('/profile'); handleMenuClose(); }}>User Profile</MenuItem>
+              <MenuItem onClick={() => { navigate('/settings'); handleMenuClose(); }}>System Settings</MenuItem>
+              <MenuItem onClick={handleLogout}>Logout</MenuItem>
+            </Menu>
+          </Box>
         </Toolbar>
       </AppBar>
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={handleDrawerToggle}
+        ModalProps={{
+          keepMounted: true, // Better open performance on mobile.
+        }}
+        sx={{
+          display: { xs: 'block', sm: 'none' }, // Only show on xs screens
+          '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 240 },
+        }}
+      >
+        <Toolbar /> {/* To push content below AppBar */}
+        <List>
+          {menuItems.map((item) => (
+            <ListItem key={item.text} disablePadding>
+              <ListItemButton onClick={() => { navigate(item.path); handleDrawerToggle(); }}>
+                <ListItemText primary={item.text} />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+      </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}> {/* mt for AppBar height */}
         {children}
       </Box>
