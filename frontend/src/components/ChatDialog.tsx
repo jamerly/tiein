@@ -50,7 +50,7 @@ const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chat
         const chunks = chunk.split('\n');
         for( var i=0;i<chunks.length;i++){
           const currentChunk = chunks[i];
-          if( currentChunk.startsWith('data:')){
+          if( currentChunk.startsWith('data:') ){
             const data = currentChunk.substring(5).trim();
             if (data === '[DONE]') {
               // Stream finished, save history (this part needs backend implementation)
@@ -58,6 +58,14 @@ const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chat
               return;
             }
             accumulatedResponse += data;
+            setMessages((prevMessages) => {
+              const newMessages = [...prevMessages];
+              // Update the last AI message placeholder
+              newMessages[newMessages.length - 1] = { type: 'ai', text: accumulatedResponse };
+              return newMessages;
+            });
+          }else{
+            // console.warn('Unexpected chunk format:', currentChunk);
           }
         }
         // if (chunk === '[DONE]') {
@@ -67,12 +75,12 @@ const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chat
         //   return;
         // }
         // accumulatedResponse += chunk;
-        setMessages((prevMessages) => {
-          const newMessages = [...prevMessages];
-          // Update the last AI message placeholder
-          newMessages[newMessages.length - 1] = { type: 'ai', text: accumulatedResponse };
-          return newMessages;
-        });
+        // setMessages((prevMessages) => {
+        //   const newMessages = [...prevMessages];
+        //   // Update the last AI message placeholder
+        //   newMessages[newMessages.length - 1] = { type: 'ai', text: accumulatedResponse };
+        //   return newMessages;
+        // });
       });
     } catch (error) {
       console.error('Error sending message:', error);

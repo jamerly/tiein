@@ -20,6 +20,8 @@ import reactor.core.publisher.Mono;
 import java.util.*;
 
 import ai.jamerly.tiein.entity.MCPTool;
+import ai.jamerly.tiein.entity.MCPResource;
+import ai.jamerly.tiein.service.MCPResourceService;
 
 
 @Slf4j
@@ -30,6 +32,9 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
 
     @Autowired // Autowire MCPToolService
     private MCPToolService mcpToolService;
+
+    @Autowired // Autowire MCPResourceService
+    private MCPResourceService mcpResourceService;
 
     private String apiUrl = "https://api.openai.com/v1/chat/completions";
 
@@ -51,10 +56,12 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
 //        requestBody.put("temperature", aiRequest.getTemperature());
         requestBody.put("stream", true);
 
-        // Add tools based on groupId
+        // Add tools and resources based on groupId
         if (aiRequest.getGroupId() != null && !aiRequest.getGroupId().isEmpty()) {
             try {
                 Long groupId = Long.parseLong(aiRequest.getGroupId());
+
+                // Add tools
                 List<MCPTool> tools = mcpToolService.getToolsByGroupId(groupId);
                 if (!tools.isEmpty()) {
                     JSONArray toolsArray = new JSONArray();
@@ -72,10 +79,39 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
                     }
                     requestBody.put("tools", toolsArray);
                 }
+
+                // Add resources to system message
+                List<ai.jamerly.tiein.entity.MCPResource> resources = mcpResourceService.getResourcesByGroupId(groupId);
+                if (!resources.isEmpty()) {
+                    StringBuilder resourceContent = new StringBuilder();
+                    resourceContent.append("\n\nAvailable Resources:\n");
+                    for (ai.jamerly.tiein.entity.MCPResource resource : resources) {
+                        resourceContent.append("--- Resource Name: ").append(resource.getName()).append(" ---\n");
+                        resourceContent.append(resource.getContent()).append("\n");
+                    }
+
+                    // Find or create a system message to append resource content
+                    List<Map<String, Object>> messages = (List<Map<String, Object>>) requestBody.get("messages");
+                    Optional<Map<String, Object>> systemMessageOptional = messages.stream()
+                            .filter(m -> "system".equals(m.get("role")))
+                            .findFirst();
+
+                    if (systemMessageOptional.isPresent()) {
+                        Map<String, Object> systemMessage = systemMessageOptional.get();
+                        String currentContent = (String) systemMessage.get("content");
+                        systemMessage.put("content", currentContent + resourceContent.toString());
+                    } else {
+                        Map<String, Object> newSystemMessage = new HashMap<>();
+                        newSystemMessage.put("role", "system");
+                        newSystemMessage.put("content", resourceContent.toString());
+                        messages.add(0, newSystemMessage); // Add as the first message
+                    }
+                }
+
             } catch (NumberFormatException e) {
                 log.error("Invalid groupId format: {}", aiRequest.getGroupId());
             } catch (Exception e) {
-                log.error("Error assembling tools for groupId {}: {}", aiRequest.getGroupId(), e.getMessage());
+                log.error("Error assembling tools or resources for groupId {}: {}", aiRequest.getGroupId(), e.getMessage());
             }
         }
 
