@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Box, CircularProgress, Button, Grid, Card, CardContent, TextField, Paper } from '@mui/material';
+import { Typography, Box, CircularProgress, Button, Grid, Card, CardContent, TextField, Paper, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api'; // Import the API service 
-
+import { fetchGroups } from '../services/group'; // Import fetchGroups and Group interface
+import type { Group } from '../services/group'; // Import Group type for TypeScript
 interface Message {
   id: number;
   text: string;
@@ -16,11 +17,25 @@ const DashboardPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [hasApiKey, setHasApiKey] = useState<boolean>(false); // New state for API key
+  const [groups, setGroups] = useState<Group[]>([]); // State for groups
+  const [selectedGroup, setSelectedGroup] = useState<string>(''); // State for selected group
 
   useEffect(() => {
     const checkApiKeyStatus = async () => {
       const apiKey = await api.get('/admin/settings/openai/key');
       setHasApiKey(!!apiKey);
+    };
+
+    const loadGroups = async () => {
+      try {
+        const response = await fetchGroups();
+        setGroups(response.content);
+        if (response.content.length > 0) {
+          setSelectedGroup(response.content[0].id.toString()); // Select the first group by default
+        }
+      } catch (err) {
+        console.error('Failed to fetch groups:', err);
+      }
     };
 
     const fetchData = async () => {
@@ -35,6 +50,7 @@ const DashboardPage: React.FC = () => {
     };
 
     checkApiKeyStatus(); // Check API key status on component mount
+    loadGroups(); // Load groups on component mount
     fetchData();
   }, []);
 
@@ -70,7 +86,10 @@ const DashboardPage: React.FC = () => {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`/api/chat/openai?message=${encodeURIComponent(messageText)}`, {
+      // TODO: Incorporate selectedGroup into the API call if needed
+      console.log('Selected Group:', selectedGroup); 
+
+      const response = await fetch(`/api/chat/openai?message=${encodeURIComponent(messageText)}&groupId=${encodeURIComponent(selectedGroup)}`, {
         method: 'GET',
         headers: headers,
       });
@@ -209,7 +228,7 @@ const DashboardPage: React.FC = () => {
             </Box>
           ))}
         </Box>
-        <Box sx={{ display: 'flex' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}> {/* Added alignItems: 'center' */}
           <TextField
             fullWidth
             variant="outlined"
@@ -221,9 +240,27 @@ const DashboardPage: React.FC = () => {
                 handleSendMessage();
               }
             }}
+            size="small" // Added size="small" to match the Select component
             disabled={!hasApiKey} // Disable input if no API key
           />
-          <Button variant="contained" onClick={handleSendMessage} sx={{ ml: 1 }} disabled={!hasApiKey}>
+          <FormControl sx={{ minWidth: 140, ml: 1, mr: 1 }} size="small"> {/* Added FormControl for Select */}
+            <InputLabel id="group-select-label">Group</InputLabel>
+            <Select
+              labelId="group-select-label"
+              id="group-select"
+              value={selectedGroup}
+              label="Group"
+              onChange={(e) => setSelectedGroup(e.target.value as string)}
+              disabled={!hasApiKey || groups.length === 0} // Disable if no API key or no groups
+            >
+              {groups.map((group) => (
+                <MenuItem key={group.id} value={group.id.toString()}>
+                  {group.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button variant="contained" onClick={handleSendMessage} disabled={!hasApiKey}>
             Send
           </Button>
         </Box>
@@ -263,44 +300,44 @@ const DashboardPage: React.FC = () => {
             The MCP Server acts as the central hub for managing and executing your custom tools, resources, and prompts. It exposes a set of RESTful APIs for programmatic interaction, and a Python SDK is available for simplified client-side development.
           </Typography>
           <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-            Key Server Endpoints (<code>/mcp-server</code> prefix):
+            Key Server Endpoints (<code >/mcp-server</code> prefix):
           </Typography>
           <Typography component="div" variant="body2">
-            <ul>
-              <li><code>/health</code> (GET): Check the server's operational status.</li>
-              <li><code>/info</code> (GET): Retrieve server application details (name, version, uptime).</li>
-              <li><code>/execute-by-name</code> (POST): Execute a registered tool by its unique name.</li>
-              <li><code>/tools/all</code> (GET): List all available tools with pagination support.</li>
-              <li><code>/settings/all</code> (GET): Access system-wide configuration settings.</li>
-              <li><code>/status/initialized</code> (GET): Verify if the system has been initialized with a user.</li>
-            </ul>
+            <ul >
+              <li ><code >/health</code> (GET): Check the server's operational status.</li>
+              <li ><code >/info</code> (GET): Retrieve server application details (name, version, uptime).</li>
+              <li ><code >/execute-by-name</code> (POST): Execute a registered tool by its unique name.</li>
+              <li ><code >/tools/all</code> (GET): List all available tools with pagination support.</li>
+              <li ><code >/settings/all</code> (GET): Access system-wide configuration settings.</li>
+              <li ><code >/status/initialized</code> (GET): Verify if the system has been initialized with a user.</li>
+            </ul >
           </Typography>
           <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
             Interacting with the Server:
           </Typography>
           <Typography component="div" variant="body2">
-            <ul>
-              <li><b>Authentication:</b> Currently, most API endpoints do not require authentication. However, the server provides <code>/user/register</code> and <code>/user/login</code> endpoints for user management. Future updates may introduce enforced authentication for all API interactions.</li>
-              <li><b>Tool Execution:</b> Tools can be executed by name, allowing dynamic invocation of custom logic.</li>
-              <li><b>Data Management:</b> The server provides endpoints for managing various entities like tools, resources, and prompts, often supporting pagination for large datasets.</li>
-            </ul>
+            <ul >
+              <li ><b >Authentication:</b> Currently, most API endpoints do not require authentication. However, the server provides <code >/user/register</code> and <code >/user/login</code> endpoints for user management. Future updates may introduce enforced authentication for all API interactions.</li>
+              <li ><b >Tool Execution:</b> Tools can be executed by name, allowing dynamic invocation of custom logic.</li>
+              <li ><b >Data Management:</b> The server provides endpoints for managing various entities like tools, resources, and prompts, often supporting pagination for large datasets.</li>
+            </ul >
           </Typography>
           <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
             Python SDK Client:
           </Typography>
           <Typography variant="body1" gutterBottom>
-            The <code>python-sdk</code> simplifies interaction with the MCP Server. The <code>Session</code> class within the SDK provides a high-level interface to:
+            The <code >python-sdk</code> simplifies interaction with the MCP Server. The <code >Session</code> class within the SDK provides a high-level interface to:
           </Typography>
           <Typography component="div" variant="body2">
-            <ul>
-              <li>Interact with the server's APIs.</li>
-              <li>Call registered tools.</li>
-              <li>Manage resources and prompts.</li>
-              <li>Handle streaming responses (e.g., for long-running operations).</li>
-            </ul>
+            <ul >
+              <li >Interact with the server's APIs.</li>
+              <li >Call registered tools.</li>
+              <li >Manage resources and prompts.</li>
+              <li >Handle streaming responses (e.g., for long-running operations).</li>
+            </ul >
           </Typography>
           <Typography variant="body1" gutterBottom>
-            <b>Example (Conceptual Python SDK Usage):</b>
+            <b >Example (Conceptual Python SDK Usage):</b>
           </Typography>
           <Box sx={{ bgcolor: '#f0f0f0', p: 2, borderRadius: 1, overflowX: 'auto' }}>
             <Typography component="pre" variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
