@@ -3,34 +3,18 @@ import {
   Typography,
   Box,
   CircularProgress,
-  Grid,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Button,
-  IconButton,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  TextField,
-  Alert,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, 
+  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert, TablePagination,
   MenuItem,
-  InputAdornment,
   FormControlLabel,
-  Checkbox,
   Switch,
-  TablePagination,
+
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon, InfoOutlined as InfoOutlinedIcon } from '@mui/icons-material';
-import api,{HttpService} from '../services/api';
+import { Checkbox } from '@mui/material';
 import { fetchGroups } from '../services/group';
 import { v4 as uuidv4 } from 'uuid';
-import type { Tool, ToolsResponse, Parameter } from '../services/tools';
+import type { Tool, Parameter } from '../services/tools';
 import { fetchTools,createTool,updateTool,deleteTool } from '../services/tools';
 import workerService, { type Worker } from '../services/worker';
 
@@ -39,13 +23,13 @@ const ToolManagementPage: React.FC = () => {
   const [tools, setTools] = useState<Tool[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
   const [currentTool, setCurrentTool] = useState<Tool | null>(null);
   
-  // Pagination states
-  const [page, setPage] = useState(0); // 0-indexed page number
-  const [rowsPerPage, setRowsPerPage] = useState(10); // Items per page
-  const [totalElements, setTotalElements] = useState(0);
+  
 
   const [availableGroups, setAvailableGroups] = useState<{ id: number; name: string }[]>([]); // New state for available groups
   const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]); // New state for available workers
@@ -314,11 +298,11 @@ const ToolManagementPage: React.FC = () => {
 
     setHttpBody(tool && tool.httpBody ? tool.httpBody : '');
     setGroovyScript(tool && tool.groovyScript ? tool.groovyScript : '');
-    setDescription(tool ? tool.description : '');
+    setDescription(tool?.description ?? '');
     // Set group name based on tool.groupId
     setSelectedGroupId(tool?.groupId);
     // Set selected worker ID
-    setSelectedWorkerId(tool?.workerId); // Assuming tool has workerId
+    setSelectedWorkerId(tool?.workerId);
     setInputParameters(jsonSchemaToParameters(tool?.inputSchemaJson));
     setOutputParameters(jsonSchemaToParameters(tool?.outputSchemaJson));
     setInputSchemaJsonRaw(tool?.inputSchemaJson || '');
@@ -419,7 +403,7 @@ const ToolManagementPage: React.FC = () => {
         await createTool(toolData);
       }
       setPage(0); // Reset to first page after add/update
-      fetchTools(0, rowsPerPage);
+      _fetchTools(page, rowsPerPage);
       handleCloseDialog();
     } catch (err: unknown) {
       setDialogError((err as Error).message || 'Operation failed.');
@@ -432,7 +416,7 @@ const ToolManagementPage: React.FC = () => {
       try {
         await deleteTool(id); // Use new deleteTool function
         setPage(0); // Reset to first page after delete
-        fetchTools(0, rowsPerPage);
+        _fetchTools(page, rowsPerPage);
       } catch (err: unknown) {
         setError((err as Error).message || 'Failed to delete tool.');
         console.error('Delete tool error:', err);
@@ -505,13 +489,26 @@ const ToolManagementPage: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
       <TablePagination
         rowsPerPageOptions={[5, 10, 25]}
         component="div"
         count={totalElements}
         rowsPerPage={rowsPerPage}
         page={page}
-        onPageChange={(event, newPage) => setPage(newPage)}
+        onPageChange={(_, newPage) => setPage(newPage)}
+        onRowsPerPageChange={(event) => {
+          setRowsPerPage(parseInt(event.target.value, 10));
+          setPage(0);
+        }}
+      />
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25]}
+        component="div"
+        count={totalElements}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={(_, newPage) => setPage(newPage)}
         onRowsPerPageChange={(event) => {
           setRowsPerPage(parseInt(event.target.value, 10));
           setPage(0); // Reset to first page when rows per page changes
@@ -672,26 +669,8 @@ const ToolManagementPage: React.FC = () => {
               Input Schema Parameters
               <IconButton
                 onClick={() => handleOpenHelpDialog(
-                  'Input Schema Parameters Help',
-                  `Define the expected input parameters for the tool using JSON Schema. Each parameter has a name, type, description, and can be marked as required. You can also specify a default value or a list of allowed enum values for string types.
-
-Example JSON Schema for input parameters:
-{
-  "type": "object",
-  "properties": {
-    "city": {
-      "type": "string",
-      "description": "The city to get the weather for"
-    },
-    "unit": {
-      "type": "string",
-      "enum": ["celsius", "fahrenheit"],
-      "description": "The unit of temperature",
-      "default": "celsius"
-    }
-  },
-  "required": ["city"]
-}`
+                  "Input Schema Parameters Help",
+                  "Define the input parameters for your tool using JSON Schema. These parameters will be used to generate the input form for your tool."
                 )}
                 size="small"
               >
@@ -834,24 +813,7 @@ const ParameterRow: React.FC<ParameterRowProps> = ({ parameter, onChange, onRemo
     onChange({ ...parameter, defaultValue: value });
   };
 
-  const parameterHelpContent = `
-    Define a parameter for the tool's input or output schema.
-
-    - Name: The unique name of the parameter (e.g., 'city', 'temperature').
-    - Type: The data type of the parameter (e.g., string, integer, boolean, array, object).
-    - Description: A brief explanation of what the parameter represents.
-    - Required: Check if this parameter is mandatory.
-    - Default Value: An optional default value for the parameter.
-    - Enum: For 'string' type, a comma-separated list of allowed values (e.g., 'celsius, fahrenheit').
-
-    Example JSON Schema for a parameter:
-    {
-      "type": "string",
-      "description": "The city to get the weather for",
-      "enum": ["New York", "London"],
-      "default": "New York"
-    }
-  `;
+  
 
   return (
     <Box sx={{ display: 'flex', gap: 1, mb: 1, alignItems: 'center' }}>

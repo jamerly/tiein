@@ -3,6 +3,8 @@ package ai.jamerly.tiein.service;
 import ai.jamerly.tiein.entity.MCPPrompt;
 import ai.jamerly.tiein.repository.MCPPromptRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,8 +16,8 @@ public class MCPPromptService {
     @Autowired
     private MCPPromptRepository mcpPromptRepository;
 
-    public List<MCPPrompt> getAllPrompts() {
-        return mcpPromptRepository.findAll();
+    public Page<MCPPrompt> getAllPrompts(Pageable pageable) {
+        return mcpPromptRepository.findAll(pageable);
     }
 
     public Optional<MCPPrompt> getPromptByName(String name) {

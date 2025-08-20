@@ -2,59 +2,60 @@ import React, { useState, useEffect } from 'react';
 import { 
   Typography, Box, CircularProgress, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, 
-  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert
+  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert, TablePagination
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
-import api from '../services/api';
+import type { Prompt } from '../services/prompts';
+import { fetchPrompts, createPrompt, updatePrompt, deletePrompt } from '../services/prompts';
 
-interface Prompt {
-  id: number;
-  name: string;
-  content: string;
-  description?: string;
-  inputSchemaJson?: string;
-  outputSchemaJson?: string;
-}
+
 
 const PromptManagementPage: React.FC = () => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState<Prompt | null>(null);
   
-  const [name, setName] = useState('');
-  const [content, setContent] = useState('');
-  const [description, setDescription] = useState('');
-  const [inputSchemaJson, setInputSchemaJson] = useState('');
-  const [outputSchemaJson, setOutputSchemaJson] = useState('');
-  const [dialogError, setDialogError] = useState<string | null>(null);
-
-  const fetchPrompts = async () => {
+  const loadPrompts = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<Prompt[]>('/mcp/prompts');
-      setPrompts(response);
+      const response = await fetchPrompts(page, rowsPerPage);
+      setPrompts(response.content);
+      setTotalElements(response.totalElements);
     } catch (err: unknown) {
       setError((err as Error).message || 'Failed to fetch prompts.');
-      console.error('Fetch prompts error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPrompts();
-  }, []);
+    loadPrompts();
+  }, [page, rowsPerPage]);
+  
+  const [name, setName] = useState<string | undefined>('');
+  const [content, setContent] = useState<string | undefined>('');
+  const [description, setDescription] = useState<string | undefined>('');
+  const [inputSchemaJson, setInputSchemaJson] = useState<string | undefined>('');
+  const [outputSchemaJson, setOutputSchemaJson] = useState<string | undefined>('');
+  const [dialogError, setDialogError] = useState<string | null>(null);
+
+  
+
+  
 
   const handleOpenDialog = (prompt: Prompt | null = null) => {
     setCurrentPrompt(prompt);
-    setName(prompt ? prompt.name : '');
-    setContent(prompt ? prompt.content : '');
-    setDescription(prompt ? prompt.description : '');
-    setInputSchemaJson(prompt && prompt.inputSchemaJson ? prompt.inputSchemaJson : '');
-    setOutputSchemaJson(prompt && prompt.outputSchemaJson ? prompt.outputSchemaJson : '');
+    setName(prompt?.name || '');
+    setContent(prompt?.content || '');
+    setDescription(prompt?.description || '');
+    setInputSchemaJson(prompt?.inputSchemaJson || '');
+    setOutputSchemaJson(prompt?.outputSchemaJson || '');
     setDialogError(null);
     setOpenDialog(true);
   };
@@ -79,12 +80,12 @@ const PromptManagementPage: React.FC = () => {
 
       if (currentPrompt) {
         // Update prompt
-        await api.put(`/mcp/prompts/${currentPrompt.id}`, { id: currentPrompt.id, ...promptData });
+        await updatePrompt(currentPrompt.id, { id: currentPrompt.id, ...promptData } as Prompt);
       } else {
         // Create prompt
-        await api.post('/mcp/prompts', promptData);
+        await createPrompt(promptData as Omit<Prompt, 'id'>);
       }
-      fetchPrompts();
+      loadPrompts();
       handleCloseDialog();
     } catch (err: unknown) {
       setDialogError((err as Error).message || 'Operation failed.');
@@ -95,8 +96,8 @@ const PromptManagementPage: React.FC = () => {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this prompt?')) {
       try {
-        await api.delete(`/mcp/prompts/${id}`);
-        fetchPrompts();
+        await deletePrompt(id);
+        loadPrompts();
       } catch (err: unknown) {
         setError((err as Error).message || 'Failed to delete prompt.');
         console.error('Delete prompt error:', err);
@@ -145,7 +146,7 @@ const PromptManagementPage: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {prompts.map((prompt) => (
+            {(prompts ?? []).map((prompt) => (
               <TableRow key={prompt.id}>
                 <TableCell component="th" scope="row">
                   {prompt.id}
@@ -165,6 +166,19 @@ const PromptManagementPage: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25]}
+        component="div"
+        count={totalElements}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={(_, newPage) => setPage(newPage)}
+        onRowsPerPageChange={(event) => {
+          setRowsPerPage(parseInt(event.target.value, 10));
+          setPage(0);
+        }}
+      />
 
       <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="md">
         <DialogTitle>{currentPrompt ? 'Edit Prompt' : 'Add Prompt'}</DialogTitle>

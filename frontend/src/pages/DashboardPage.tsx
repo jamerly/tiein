@@ -274,19 +274,19 @@ const DashboardPage: React.FC = () => {
         Quick Actions
       </Typography>
       <Grid container spacing={2}>
-        <Grid item>
+        <Grid>
           <Button variant="contained" onClick={() => navigate('/users')}>User Management</Button>
         </Grid>
-        <Grid item>
+        <Grid>
           <Button variant="contained" onClick={() => navigate('/tools')}>Tool Management</Button>
         </Grid>
-        <Grid item>
+        <Grid>
           <Button variant="contained" onClick={() => navigate('/resources')}>Resource Management</Button>
         </Grid>
-        <Grid item>
+        <Grid>
           <Button variant="contained" onClick={() => navigate('/prompts')}>Prompt Management</Button>
         </Grid>
-        <Grid item>
+        <Grid>
           <Button variant="contained" onClick={() => navigate('/settings')}>System Settings</Button>
         </Grid>
       </Grid>

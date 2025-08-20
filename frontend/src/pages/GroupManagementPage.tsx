@@ -3,54 +3,36 @@ import {
   Typography,
   Box,
   CircularProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TablePagination,
-  TableHead,
-  TableRow,
-  Paper,
-  Button,
-  IconButton,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  TextField,
-  Alert,
-  Pagination, // Added for pagination UI
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, 
+  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert, TablePagination,
+
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
-import { fetchGroups as fetchGroupsApi, createGroup, updateGroup, deleteGroup } from '../services/group'; // Import new functions
+import { fetchGroups, createGroup, updateGroup, deleteGroup } from '../services/group';
 import type { Group } from '../services/group';
-import api from '../services/api';
-
 
 const GroupManagementPage: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
   const [currentGroup, setCurrentGroup] = useState<Group | null>(null);
   const [groupName, setGroupName] = useState('');
   const [dialogError, setDialogError] = useState<string | null>(null);
 
-  // Pagination states
-  const [page, setPage] = useState(0); // 0-indexed page
-  const [rowsPerPage, setRowsPerPage] = useState(10); // default page size
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
+  
 
-  const fetchGroups = async () => {
+  
+
+  const loadGroups = async () => {
     try {
       setLoading(true);
       setError(null);
-      // Pass page and size as query parameters
-      const response = await fetchGroupsApi(page, rowsPerPage);
-      console.log("API Response:", response);
+      const response = await fetchGroups(page, rowsPerPage);
       setGroups(response.content);
-      setTotalPages(response.totalPages);
       setTotalElements(response.totalElements);
     } catch (err: unknown) {
       setError((err as Error).message || 'Failed to fetch groups.');
@@ -61,12 +43,8 @@ const GroupManagementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchGroups();
-  }, [page, rowsPerPage]); // Re-fetch when page or rowsPerPage changes
-
-  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
-    setPage(value - 1); // Material-UI Pagination is 1-indexed, Spring Page is 0-indexed
-  };
+    loadGroups();
+  }, [page, rowsPerPage]);
 
   const handleOpenDialog = (group: Group | null = null) => {
     setCurrentGroup(group);
@@ -97,7 +75,7 @@ const GroupManagementPage: React.FC = () => {
         // Create group
         await createGroup(groupName); // Use new createGroup function
       }
-      fetchGroups(); // Refresh list
+      loadGroups(); // Refresh list
       handleCloseDialog();
     } catch (err: unknown) {
       setDialogError((err as Error).message || 'Operation failed.');
@@ -109,7 +87,7 @@ const GroupManagementPage: React.FC = () => {
     if (window.confirm('Are you sure you want to delete this group?')) {
       try {
         await deleteGroup(id); // Use new deleteGroup function
-        fetchGroups(); // Refresh list
+        loadGroups(); // Refresh list
       } catch (err: unknown) {
         setError((err as Error).message || 'Failed to delete group.');
         console.error('Delete group error:', err);
@@ -176,13 +154,26 @@ const GroupManagementPage: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
       <TablePagination
         rowsPerPageOptions={[5, 10, 25]}
         component="div"
         count={totalElements}
         rowsPerPage={rowsPerPage}
         page={page}
-        onPageChange={(event, newPage) => setPage(newPage)}
+        onPageChange={(_, newPage) => setPage(newPage)}
+        onRowsPerPageChange={(event) => {
+          setRowsPerPage(parseInt(event.target.value, 10));
+          setPage(0);
+        }}
+      />
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25]}
+        component="div"
+        count={totalElements}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={(_, newPage) => setPage(newPage)}
         onRowsPerPageChange={(event) => {
           setRowsPerPage(parseInt(event.target.value, 20));
           setPage(0); // Reset to first page when rows per page changes

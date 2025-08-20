@@ -1,87 +1,64 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Box, CircularProgress, Switch, FormControlLabel, Alert, Button, Card, CardContent, Grid, List, ListItem, ListItemButton, ListItemIcon, ListItemText, TextField } from '@mui/material';
-import { Settings as SettingsIcon, People as PeopleIcon } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { Typography, Box, CircularProgress, Grid, Card, CardContent, Switch, FormControlLabel, TextField, Button, Tabs, Tab } from '@mui/material';
 import api from '../services/api';
-import UserManagementPage from './UserManagementPage'; // Import UserManagementPage
+import UserManagementPage from './UserManagementPage';
 
 interface SystemSettingsPageProps {
-  initialTab?: 'general' | 'users';
+  initialTab?: 'users' | 'general';
 }
 
 const SystemSettingsPage: React.FC<SystemSettingsPageProps> = ({ initialTab = 'general' }) => {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState<boolean | null>(null);
-  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
-  const [openAIApiKey, setOpenAIApiKey] = useState<string>('');
-  const [openAIApiKeyStatus, setOpenAIApiKeyStatus] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [selectedMenuItem, setSelectedMenuItem] = useState(initialTab); // Default to general settings
-
-  const menuItemsData = [
-    { id: 'general', text: 'General Settings', icon: <SettingsIcon /> },
-    { id: 'users', text: 'User Management', icon: <PeopleIcon /> },
-  ];
+  const [openaiApiKey, setOpenaiApiKey] = useState('');
+  const [currentTab, setCurrentTab] = useState(initialTab);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchSettings = async () => {
       try {
-        setLoading(true);
-        setError(null);
-        const registrationResponse = await api.get<boolean>('/admin/settings/registration/status');
-        setIsRegistrationOpen(registrationResponse);
-
-        const apiKeyResponse = await api.get<string>('/admin/settings/openai/key');
-        setOpenAIApiKey(apiKeyResponse || ''); // Set to empty string if null
-
+        const regStatusResponse = await api.get('/admin/settings/registration/status');
+        setIsRegistrationOpen(regStatusResponse.data);
+        const apiKeyResponse = await api.get('/admin/settings/openai/key');
+        setOpenaiApiKey(apiKeyResponse.data);
       } catch (err: unknown) {
-        setError((err as Error).message || 'Failed to fetch settings.');
-        console.error('Fetch settings error:', err);
+        setError((err as Error).message || 'Failed to fetch system settings.');
       } finally {
         setLoading(false);
       }
     };
-
-    fetchData();
+    fetchSettings();
   }, []);
 
   const handleToggleRegistration = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const newStatus = event.target.checked;
     setIsRegistrationOpen(newStatus);
-    setUpdateStatus(null);
     try {
       await api.post('/admin/settings/registration/set', null, { params: { open: newStatus } });
-      setUpdateStatus('Registration status updated successfully!');
     } catch (err: unknown) {
-      setUpdateStatus((err as Error).message || 'Failed to update registration status.');
       console.error('Update registration status error:', err);
       // Revert UI state if update fails
       setIsRegistrationOpen(!newStatus);
     }
   };
 
-      const handleSaveOpenAIApiKey = async () => {
-        setOpenAIApiKeyStatus(null);
-        try {
-            if (openAIApiKey === '') {
-                // If the API key is empty, call the DELETE endpoint
-                await api.delete('/admin/settings/openai/key');
-                setOpenAIApiKeyStatus({ message: 'OpenAI API Key deleted successfully!', type: 'success' });
-            } else {
-                // Otherwise, call the POST endpoint to update/set the key
-                await api.post('/admin/settings/openai/key', openAIApiKey, {
-                    headers: {
-                        'Content-Type': 'text/plain',
-                    },
-                });
-                setOpenAIApiKeyStatus({ message: 'OpenAI API Key updated successfully!', type: 'success' });
-            }
-        } catch (err: any) {
-            setOpenAIApiKeyStatus({ message: (err as Error).message || 'Failed to update OpenAI API Key.', type: 'error' });
-            console.error('Update OpenAI API Key error:', err);
-        }
-    };
+  const handleSaveOpenAIApiKey = async () => {
+    try {
+      if (openaiApiKey === '') {
+        // If the API key is empty, call the DELETE endpoint
+        await api.delete('/admin/settings/openai/key');
+      } else {
+        // Otherwise, call the POST endpoint to update/set the key
+        await api.post('/admin/settings/openai/key', openaiApiKey, {
+          headers: {
+            'Content-Type': 'text/plain',
+          },
+        });
+      }
+    } catch (err: any) {
+      console.error('Update OpenAI API Key error:', err);
+    }
+  };
 
   if (loading) {
     return (
@@ -106,73 +83,47 @@ const SystemSettingsPage: React.FC<SystemSettingsPageProps> = ({ initialTab = 'g
         System Settings
       </Typography>
 
-      <Grid container spacing={3} sx={{ height: 'calc(100vh - 120px)' }}> {/* Adjust height based on AppBar and padding */}
-        {/* Left Column: Navigation Menu */}
+      <Grid container spacing={3} sx={{ flexGrow: 1 }}>
         <Grid item xs={12} md={3} sx={{ height: '100%' }}>
-          <List component="nav" sx={{ height: '100%', borderRight: '1px solid #e0e0e0' }}>
-            {menuItemsData.map((item) => (
-              <ListItem key={item.id} disablePadding>
-                <ListItemButton
-                  selected={selectedMenuItem === item.id}
-                  onClick={() => setSelectedMenuItem(item.id)}
-                >
-                  <ListItemIcon>{item.icon}</ListItemIcon>
-                  <ListItemText primary={item.text} />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Tabs
+                orientation="vertical"
+                variant="scrollable"
+                value={currentTab}
+                onChange={(_, newValue) => setCurrentTab(newValue as 'users' | 'general')}
+                aria-label="Vertical tabs example"
+                sx={{ borderRight: 1, borderColor: 'divider' }}
+              >
+                <Tab label="General" value="general" />
+                <Tab label="Users" value="users" />
+              </Tabs>
+            </CardContent>
+          </Card>
         </Grid>
-
-        {/* Right Column: Content Area */}
         <Grid item xs={12} md={9}>
-          {selectedMenuItem === 'general' && (
+          {currentTab === 'general' && (
             <Card>
               <CardContent>
-                <Typography variant="h6" gutterBottom>General Settings</Typography>
+                <Typography variant="h5" gutterBottom>
+                  General Settings
+                </Typography>
                 <FormControlLabel
-                  control={
-                    <Switch
-                      checked={isRegistrationOpen !== null ? isRegistrationOpen : false}
-                      onChange={handleToggleRegistration}
-                      name="registrationStatus"
-                      color="primary"
-                    />
-                  }
-                  label="Allow New User Registration"
+                  control={<Switch checked={isRegistrationOpen || false} onChange={handleToggleRegistration} />}
+                  label="Allow User Registration"
                 />
-                {updateStatus && (
-                  <Alert severity={updateStatus.includes('successfully') ? 'success' : 'error'} sx={{ mt: 2 }}>
-                    {updateStatus}
-                  </Alert>
-                )}
-
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="h6" gutterBottom>OpenAI API Key</Typography>
-                  <TextField
-                    fullWidth
-                    label="OpenAI API Key"
-                    variant="outlined"
-                    value={openAIApiKey}
-                    onChange={(e) => setOpenAIApiKey(e.target.value)}
-                    sx={{ mb: 2 }}
-                  />
-                  <Button variant="contained" onClick={handleSaveOpenAIApiKey}>
-                    Save OpenAI API Key
-                  </Button>
-                  {openAIApiKeyStatus && (
-                    <Alert severity={openAIApiKeyStatus.type} sx={{ mt: 2 }}>
-                      {openAIApiKeyStatus.message}
-                    </Alert>
-                  )}
-                </Box>
+                <TextField
+                  label="OpenAI API Key"
+                  fullWidth
+                  value={openaiApiKey}
+                  onChange={(e) => setOpenaiApiKey(e.target.value)}
+                  margin="normal"
+                />
+                <Button variant="contained" onClick={handleSaveOpenAIApiKey}>Save Changes</Button>
               </CardContent>
             </Card>
           )}
-
-          {selectedMenuItem === 'users' && (
-            <UserManagementPage />
-          )}
+          {currentTab === 'users' && <UserManagementPage />}
         </Grid>
       </Grid>
     </Box>

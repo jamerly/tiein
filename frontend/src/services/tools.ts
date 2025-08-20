@@ -1,5 +1,5 @@
 import { HttpService } from './api';
-import type { Group } from './group';
+import { type Group } from './group';
 import type { PagableResponse } from './api';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -24,6 +24,7 @@ export interface Tool {
   isProxy?: boolean;
   groupId?: number;
   groupName?: string;
+  workerId?: number;
 }
 
 export interface ToolsResponse extends PagableResponse<Tool> {}
@@ -38,18 +39,6 @@ export interface Parameter {
   enum?: string;
 }
 
-
-export interface Parameter {
-  id: string; // Unique ID for React key
-  name: string;
-  type: 'string' | 'integer' | 'boolean' | 'array' | 'object';
-  description: string;
-  required: boolean;
-  defaultValue?: string | number | boolean;
-  enum?: string; // Stored as comma-separated string for simplicity in TextField
-}
-
-
 export const fetchTools = async (pageNumber: number, pageSize: number): Promise<ToolsResponse> => {
   const response = await HttpService.getPagable<Tool>(`/mcp/tools`, pageNumber, pageSize);
   return response;
@@ -60,8 +49,8 @@ export const createTool = async (toolData: Omit<Tool, 'id' | 'groupName'>): Prom
   return response;
 };
 
-export const updateTool = async (id: number, toolData: Omit<Tool, 'groupName'>): Promise<Tool> => {
-  const response = await HttpService.put<Tool>(`/mcp/tools/${id}`, { id, ...toolData });
+export const updateTool = async (id: number, toolData: Omit<Tool, 'id' | 'groupName'>): Promise<Tool> => {
+  const response = await HttpService.put<Tool>(`/mcp/tools/${id}`, toolData);
   return response;
 };
 
@@ -138,4 +127,14 @@ export const parametersToJsonSchema = (parameters: Parameter[]): string | undefi
     required: required,
   };
   return JSON.stringify(schema, null, 2);
+};
+
+export const fetchToolById = async (id: number): Promise<Tool> => {
+  const response = await HttpService.get<Tool>(`/mcp/tools/${id}`);
+  return response;
+};
+
+export const fetchToolsByGroupId = async (groupId: number): Promise<Tool[]> => {
+  const response = await HttpService.get<Tool[]>(`/mcp/tools/by-group/${groupId}`);
+  return response;
 };

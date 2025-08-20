@@ -1,39 +1,25 @@
-import React, { useRef } from 'react';
-import MonacoEditor from 'react-monaco-editor';
+import React from 'react';
+import Editor from '@monaco-editor/react';
 
 interface CodeEditorProps {
   value: string;
   language: string;
-  onChange: (newValue: string) => void;
-  readOnly?: boolean;
+  onChange: (value: string) => void;
 }
 
-const CodeEditor: React.FC<CodeEditorProps> = ({ value, language, onChange, readOnly = false }) => {
-  const editorRef = useRef(null);
-
-  const handleEditorDidMount = (editor: any, monaco: any) => {
-    editorRef.current = editor;
-    // Optional: Configure Monaco Editor here if needed
-  };
-
-  const handleChange = (newValue: string, event: any) => {
-    onChange(newValue);
-  };
-
+const CodeEditor: React.FC<CodeEditorProps> = ({ value, language, onChange }) => {
   return (
-    <MonacoEditor
+    <Editor
       width="100%"
-      height="600px"
+      height="300"
       language={language}
-      theme="vs-dark" // Or 'light'
       value={value}
       options={{
-        readOnly: readOnly,
+        selectOnLineNumbers: true,
         minimap: { enabled: false },
-        // Add other options as needed
+        readOnly: false,
       }}
-      onChange={handleChange}
-      editorDidMount={handleEditorDidMount}
+      onChange={(newValue) => onChange(newValue || '')}
     />
   );
 };

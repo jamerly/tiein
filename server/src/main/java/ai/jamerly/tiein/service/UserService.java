@@ -4,6 +4,8 @@ import ai.jamerly.tiein.entity.User;
 import ai.jamerly.tiein.repository.UserRepository;
 import ai.jamerly.tiein.security.jwt.JwtUtil; // Use the new JwtUtil
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -116,8 +118,8 @@ public class UserService implements UserDetailsService {
         return userRepository.count();
     }
 
-    public java.util.List<User> getAllUsers() {
-        return userRepository.findAll();
+    public Page<User> getAllUsers(Pageable pageable) {
+        return userRepository.findAll(pageable);
     }
 
     public Optional<User> getUserById(Long id) {

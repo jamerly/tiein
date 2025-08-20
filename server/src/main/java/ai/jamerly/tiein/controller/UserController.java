@@ -3,8 +3,11 @@ package ai.jamerly.tiein.controller;
 import ai.jamerly.tiein.dto.ChangePasswordRequest;
 import ai.jamerly.tiein.dto.LoginRequest;
 import ai.jamerly.tiein.dto.ApiResponse;
+import ai.jamerly.tiein.entity.User;
 import ai.jamerly.tiein.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -57,8 +60,8 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<java.util.List<ai.jamerly.tiein.entity.User>>> getAllUsers() {
-        java.util.List<ai.jamerly.tiein.entity.User> users = userService.getAllUsers();
+    public ResponseEntity<ApiResponse<Page<ai.jamerly.tiein.entity.User>>> getAllUsers(Pageable pageable) {
+        Page<User> users = userService.getAllUsers(pageable);
         return ResponseEntity.ok(ApiResponse.success(users));
     }
 

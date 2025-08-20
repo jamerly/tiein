@@ -81,8 +81,8 @@ public class MCPController {
 
     // MCPResource CRUD
     @GetMapping("/resources")
-    public ResponseEntity<ApiResponse<List<MCPResource>>> getAllResources() {
-        List<MCPResource> resources = mcpResourceService.getAllResources();
+    public ResponseEntity<ApiResponse<Page<MCPResource>>> getAllResources(Pageable pageable) {
+        Page<MCPResource> resources = mcpResourceService.getAllResources(pageable);
         return ResponseEntity.ok(ApiResponse.success(resources));
     }
 
@@ -117,8 +117,8 @@ public class MCPController {
 
     // MCPPrompt CRUD
     @GetMapping("/prompts")
-    public ResponseEntity<ApiResponse<List<MCPPrompt>>> getAllPrompts() {
-        List<MCPPrompt> prompts = mcpPromptService.getAllPrompts();
+    public ResponseEntity<ApiResponse<Page<MCPPrompt>>> getAllPrompts(Pageable pageable) {
+        Page<MCPPrompt> prompts = mcpPromptService.getAllPrompts(pageable);
         return ResponseEntity.ok(ApiResponse.success(prompts));
     }
 

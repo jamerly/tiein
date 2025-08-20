@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
@@ -274,10 +275,12 @@ public class MCPWebSocketHandler extends TextWebSocketHandler {
 
     private void handleResourcesList(WebSocketSession session, JsonNode idNode, JsonNode paramsNode) throws IOException {
         try {
-            List<MCPResource> mcpResources = mcpResourceService.getAllResources();
+            Page<MCPResource> mcpResources = mcpResourceService.getAllResources(
+                    PageRequest.of(0,1000, Sort.by("id").descending())
+            );
             ArrayNode resourcesArray = objectMapper.createArrayNode();
 
-            for (MCPResource mcpResource : mcpResources) {
+            for (MCPResource mcpResource : mcpResources.getContent()) {
                 ResourceDto resourceDto = new ResourceDto();
                 resourceDto.setUri(mcpResource.getUri());
                 resourceDto.setDescription(mcpResource.getDescription());
@@ -323,7 +326,9 @@ public class MCPWebSocketHandler extends TextWebSocketHandler {
 
     private void handlePromptsList(WebSocketSession session, JsonNode idNode, JsonNode paramsNode) throws IOException {
         try {
-            List<MCPPrompt> mcpPrompts = mcpPromptService.getAllPrompts();
+            Page<MCPPrompt> mcpPrompts = mcpPromptService.getAllPrompts(
+                    PageRequest.of(0,1000)
+            );
             ArrayNode promptsArray = objectMapper.createArrayNode();
 
             for (MCPPrompt mcpPrompt : mcpPrompts) {

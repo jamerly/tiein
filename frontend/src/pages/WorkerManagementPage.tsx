@@ -22,12 +22,13 @@ import {
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import CodeEditor from '../components/CodeEditor';
-import workerService, { type Worker, type WorkersResponse } from '../services/worker';
+import workerService, { type Worker } from '../services/worker';
 
 const WorkerManagementPage: React.FC = () => {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
   const [openDialog, setOpenDialog] = useState(false);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
 
@@ -43,15 +44,15 @@ const WorkerManagementPage: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10); // Items per page
   const [totalElements, setTotalElements] = useState(0);
 
-  const _fetchWorkers = async (pageNumber: number, pageSize: number) => {
+  
+
+  const loadWorkers = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response: WorkersResponse = await workerService.getAllWorkers(pageNumber, pageSize);
-      console.log("API Response:", response);
-      setWorkers(response.content || []);
-      setTotalElements(response.totalElements || 0);
-      setPage(response.number); // Update page state based on actual response page number
+      const response = await workerService.getAllWorkers(page, rowsPerPage);
+      setWorkers(response.content);
+      setTotalElements(response.totalElements);
     } catch (err: unknown) {
       setError((err as Error).message || 'Failed to fetch workers.');
       console.error('Fetch workers error:', err);
@@ -61,7 +62,7 @@ const WorkerManagementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    _fetchWorkers(page, rowsPerPage);
+    loadWorkers();
   }, [page, rowsPerPage]);
 
   const handleOpenDialog = (worker: Worker | null = null) => {
@@ -98,7 +99,7 @@ const WorkerManagementPage: React.FC = () => {
         await workerService.createWorker(workerData);
       }
       setPage(0); // Reset to first page after add/update
-      _fetchWorkers(0, rowsPerPage);
+      loadWorkers();
       handleCloseDialog();
     } catch (err: unknown) {
       setDialogError((err as Error).message || 'Operation failed.');
@@ -111,7 +112,7 @@ const WorkerManagementPage: React.FC = () => {
       try {
         await workerService.deleteWorker(id);
         setPage(0); // Reset to first page after delete
-        _fetchWorkers(0, rowsPerPage);
+        loadWorkers();
       } catch (err: unknown) {
         setError((err as Error).message || 'Failed to delete worker.');
         console.error('Delete worker error:', err);
@@ -187,7 +188,7 @@ const WorkerManagementPage: React.FC = () => {
                   <IconButton aria-label="edit" onClick={() => handleOpenDialog(worker)}>
                     <EditIcon />
                   </IconButton>
-                  <IconButton aria-label="delete" onClick={() => handleDelete(worker.id)}>
+                  <IconButton aria-label="delete" onClick={() => handleDelete(String(worker.id))}>
                     <DeleteIcon />
                   </IconButton>
                 </TableCell>
@@ -196,13 +197,26 @@ const WorkerManagementPage: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
       <TablePagination
         rowsPerPageOptions={[5, 10, 25]}
         component="div"
         count={totalElements}
         rowsPerPage={rowsPerPage}
         page={page}
-        onPageChange={(event, newPage) => setPage(newPage)}
+        onPageChange={(_, newPage) => setPage(newPage)}
+        onRowsPerPageChange={(event) => {
+          setRowsPerPage(parseInt(event.target.value, 10));
+          setPage(0);
+        }}
+      />
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25]}
+        component="div"
+        count={totalElements}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={(_, newPage) => setPage(newPage)}
         onRowsPerPageChange={(event) => {
           setRowsPerPage(parseInt(event.target.value, 10));
           setPage(0); // Reset to first page when rows per page changes

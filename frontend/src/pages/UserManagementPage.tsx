@@ -2,21 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { 
   Typography, Box, CircularProgress, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, 
-  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert, MenuItem
+  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert, MenuItem, TablePagination
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
-import api from '../services/api';
+import type { User } from '../services/user';
+import { fetchUsers, createUser, updateUser, deleteUser } from '../services/user';
 
-interface User {
-  id: number;
-  username: string;
-  role: string;
-}
+
 
 const UserManagementPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [username, setUsername] = useState('');
@@ -24,12 +24,15 @@ const UserManagementPage: React.FC = () => {
   const [role, setRole] = useState('');
   const [dialogError, setDialogError] = useState<string | null>(null);
 
-  const fetchUsers = async () => {
+  
+
+  const loadUsers = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<User[]>('/user');
-      setUsers(response);
+      const response = await fetchUsers(page, rowsPerPage);
+      setUsers(response.content);
+      setTotalElements(response.totalElements);
     } catch (err: unknown) {
       setError((err as Error).message || 'Failed to fetch users.');
       console.error('Fetch users error:', err);
@@ -39,8 +42,8 @@ const UserManagementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    loadUsers();
+  }, [page, rowsPerPage]);
 
   const handleOpenDialog = (user: User | null = null) => {
     setCurrentUser(user);
@@ -65,12 +68,12 @@ const UserManagementPage: React.FC = () => {
     try {
       if (currentUser) {
         // Update user
-        await api.put(`/user/${currentUser.id}`, { username, password: password || undefined, role });
+        await updateUser(currentUser.id, { username, password: password || undefined, role });
       } else {
         // Create user
-        await api.post('/user', { username, password, role });
+        await createUser({ username, password, role });
       }
-      fetchUsers();
+      loadUsers();
       handleCloseDialog();
     } catch (err: unknown) {
       setDialogError((err as Error).message || 'Operation failed.');
@@ -81,8 +84,8 @@ const UserManagementPage: React.FC = () => {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
-        await api.delete(`/user/${id}`);
-        fetchUsers();
+        await deleteUser(id);
+        loadUsers();
       } catch (err: unknown) {
         setError((err as Error).message || 'Failed to delete user.');
         console.error('Delete user error:', err);
@@ -132,7 +135,7 @@ const UserManagementPage: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {users.map((user) => (
+            {(users ?? []).map((user) => (
               <TableRow key={user.id}>
                 <TableCell component="th" scope="row">
                   {user.id}
@@ -152,6 +155,19 @@ const UserManagementPage: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25]}
+        component="div"
+        count={totalElements}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={(_, newPage) => setPage(newPage)}
+        onRowsPerPageChange={(event) => {
+          setRowsPerPage(parseInt(event.target.value, 10));
+          setPage(0);
+        }}
+      />
 
       <Dialog open={openDialog} onClose={handleCloseDialog}>
         <DialogTitle>{currentUser ? 'Edit User' : 'Add User'}</DialogTitle>

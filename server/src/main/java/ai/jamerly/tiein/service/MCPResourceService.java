@@ -3,6 +3,8 @@ package ai.jamerly.tiein.service;
 import ai.jamerly.tiein.entity.MCPResource;
 import ai.jamerly.tiein.repository.MCPResourceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,8 +16,8 @@ public class MCPResourceService {
     @Autowired
     private MCPResourceRepository mcpResourceRepository;
 
-    public List<MCPResource> getAllResources() {
-        return mcpResourceRepository.findAll();
+    public Page<MCPResource> getAllResources(Pageable pageable) {
+        return mcpResourceRepository.findAll(pageable);
     }
 
     public Optional<MCPResource> getResourceByUri(String uri) {

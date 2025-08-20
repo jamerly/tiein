@@ -1,9 +1,11 @@
+import 'react';
+/// <reference types="vite/client" />
+
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
-import UserManagementPage from './pages/UserManagementPage';
 import ToolManagementPage from './pages/ToolManagementPage';
 import ResourceManagementPage from './pages/ResourceManagementPage';
 import PromptManagementPage from './pages/PromptManagementPage';

@@ -2,56 +2,62 @@ import React, { useState, useEffect } from 'react';
 import { 
   Typography, Box, CircularProgress, 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, 
-  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert, MenuItem
+  Button, IconButton, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Alert, MenuItem, TablePagination
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
-import api from '../services/api';
+import type { Resource } from '../services/resources';
+import { fetchResources, createResource, updateResource, deleteResource } from '../services/resources';
 
-interface Resource {
-  id: number;
-  uri: string;
-  content: string;
-  contentType: string;
-  description?: string;
-}
+
 
 const ResourceManagementPage: React.FC = () => {
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
   const [currentResource, setCurrentResource] = useState<Resource | null>(null);
   
-  const [uri, setUri] = useState('');
-  const [content, setContent] = useState('');
-  const [contentType, setContentType] = useState('text/plain');
-  const [description, setDescription] = useState('');
-  const [dialogError, setDialogError] = useState<string | null>(null);
-
-  const fetchResources = async () => {
+  const loadResources = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get<Resource[]>('/mcp/resources');
-      setResources(response);
+      console.log('Fetching resources with page:', page, 'rowsPerPage:', rowsPerPage);
+      const response = await fetchResources(page, rowsPerPage);
+      console.log('Resources fetched response:', response);
+      setResources(response.content);
+      setTotalElements(response.totalElements);
     } catch (err: unknown) {
+      console.error('Error fetching resources:', err);
       setError((err as Error).message || 'Failed to fetch resources.');
-      console.error('Fetch resources error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchResources();
-  }, []);
+    console.log('useEffect triggered for ResourceManagementPage');
+    loadResources();
+  }, [page, rowsPerPage]);
+  
+  const [uri, setUri] = useState<string | undefined>('');
+  const [content, setContent] = useState<string | undefined>('');
+  const [contentType, setContentType] = useState<string | undefined>('text/plain');
+  const [description, setDescription] = useState<string | undefined>('');
+  const [dialogError, setDialogError] = useState<string | null>(null);
+
+  
+
+  
 
   const handleOpenDialog = (resource: Resource | null = null) => {
     setCurrentResource(resource);
-    setUri(resource ? resource.uri : '');
-    setContent(resource ? resource.content : '');
-    setContentType(resource ? resource.contentType : 'text/plain');
-    setDescription(resource ? resource.description : '');
+    setUri(resource?.uri || '');
+    setContent(resource?.content || '');
+    setContentType(resource?.contentType || 'text/plain');
+    setDescription(resource?.description || '');
     setDialogError(null);
     setOpenDialog(true);
   };
@@ -75,12 +81,12 @@ const ResourceManagementPage: React.FC = () => {
 
       if (currentResource) {
         // Update resource
-        await api.put(`/mcp/resources/${currentResource.id}`, { id: currentResource.id, ...resourceData });
+        await updateResource(currentResource.id, { id: currentResource.id, ...resourceData } as Resource);
       } else {
         // Create resource
-        await api.post('/mcp/resources', resourceData);
+        await createResource(resourceData as Omit<Resource, 'id'>);
       }
-      fetchResources();
+      loadResources();
       handleCloseDialog();
     } catch (err: unknown) {
       setDialogError((err as Error).message || 'Operation failed.');
@@ -91,8 +97,8 @@ const ResourceManagementPage: React.FC = () => {
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this resource?')) {
       try {
-        await api.delete(`/mcp/resources/${id}`);
-        fetchResources();
+        await deleteResource(id);
+        loadResources();
       } catch (err: unknown) {
         setError((err as Error).message || 'Failed to delete resource.');
         console.error('Delete resource error:', err);
@@ -142,7 +148,7 @@ const ResourceManagementPage: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {resources.map((resource) => (
+            {(resources ?? []).map((resource) => (
               <TableRow key={resource.id}>
                 <TableCell component="th" scope="row">
                   {resource.id}
@@ -163,6 +169,19 @@ const ResourceManagementPage: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25]}
+        component="div"
+        count={totalElements}
+        rowsPerPage={rowsPerPage}
+        page={page}
+        onPageChange={(_, newPage) => setPage(newPage)}
+        onRowsPerPageChange={(event) => {
+          setRowsPerPage(parseInt(event.target.value, 10));
+          setPage(0);
+        }}
+      />
 
       <Dialog open={openDialog} onClose={handleCloseDialog} fullWidth maxWidth="md">
         <DialogTitle>{currentResource ? 'Edit Resource' : 'Add Resource'}</DialogTitle>

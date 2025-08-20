@@ -23,7 +23,7 @@ const UserSettingPage: React.FC = () => {
     setLoading(true);
     try {
       const response = await api.get<string>('/user/permanent-token');
-      setPermanentToken(response);
+      setPermanentToken(response.data);
     } catch (err: unknown) {
       setMessage((err as Error).message || 'Failed to fetch permanent token.');
       setMessageType('error');
@@ -40,9 +40,14 @@ const UserSettingPage: React.FC = () => {
     setLoading(true);
     try {
       const response = await api.post<string>('/user/generate-permanent-token');
-      setPermanentToken(response);
-      setMessage('New permanent token generated successfully!');
-      setMessageType('success');
+      if (typeof response === 'string') {
+        setPermanentToken(response);
+        setMessage('New permanent token generated successfully!');
+        setMessageType('success');
+      } else {
+        setMessage('Unexpected response format.');
+        setMessageType('error');
+      }
     } catch (err: unknown) {
       setMessage((err as Error).message || 'Failed to generate new permanent token.');
       setMessageType('error');

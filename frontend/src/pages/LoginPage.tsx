@@ -26,7 +26,7 @@ const LoginPage: React.FC = () => {
     setError(null);
     try {
       const response = await api.post('/user/login', { username, password });
-      login(response);
+      login(response.data.token);
       navigate('/dashboard');
     } catch (err: unknown) {
       setError((err as Error).message || 'Login failed');
