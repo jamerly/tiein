@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Box, CircularProgress, Button, Grid, Card, CardContent, TextField, Paper, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { Typography, Box, CircularProgress, Button, Card, CardContent, TextField, Paper, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api'; // Import the API service 
-import { fetchGroups } from '../services/group'; // Import fetchGroups and Group interface
-import type { Group } from '../services/group'; // Import Group type for TypeScript
+import { fetchGroups, type Group } from '../services/group'; // Import fetchGroups and Group interface
 interface Message {
   id: number;
   text: string;

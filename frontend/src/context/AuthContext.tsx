@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import api,{  HttpService } from '../services/api'; // Assuming api service is in ../services/api
+import { HttpService } from '../services/api';
 
 // Define a simple User interface for the profile data
 interface UserProfile {
@@ -30,7 +30,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const fetchUserProfile = async () => {
     try {
-      const response = await api.get<UserProfile>('/user/profile');
+      const response = await HttpService.get<UserProfile>('/user/profile');
       setUser(response);
     } catch (err) {
       console.error('Failed to fetch user profile:', err);
