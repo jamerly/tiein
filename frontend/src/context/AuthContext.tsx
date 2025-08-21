@@ -44,8 +44,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const verifyTokenAndFetchProfile = async () => {
       const token = localStorage.getItem('jwtToken');
       if (token) {
-        setIsAuthenticated(true);
-        await fetchUserProfile(); // Fetch profile if authenticated
+        try {
+          await fetchUserProfile();
+          setIsAuthenticated(true); // Set to true only if profile fetch succeeds
+        } catch (error) {
+          console.error('Failed to verify token or fetch profile:', error);
+          setIsAuthenticated(false); // Set to false if profile fetch fails
+          localStorage.removeItem('jwtToken'); // Clear invalid token
+        }
       }
       setLoading(false);
     };
@@ -57,8 +63,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     console.log('Login function called with token:', token);
     localStorage.setItem('jwtToken', token);
     console.log('Token saved to localStorage:', token);
-    setIsAuthenticated(true);
-    await fetchUserProfile(); // Fetch profile after successful login
+    try {
+      await fetchUserProfile();
+      setIsAuthenticated(true); // Set to true only if profile fetch succeeds
+    } catch (error) {
+      console.error('Failed to fetch profile after login:', error);
+      setIsAuthenticated(false); // Set to false if profile fetch fails
+      localStorage.removeItem('jwtToken'); // Clear invalid token
+    }
   };
 
   const logout = () => {

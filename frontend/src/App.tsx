@@ -12,7 +12,7 @@ import RegisterPage from './pages/RegisterPage';
 import IntegrationPage from './pages/IntegrationPage'; // New Import
 import ChatBasePage from './pages/ChatBasePage'; // New Import
 import Layout from './components/Layout';
-import api from './services/api';
+import { HttpService } from './services/api';
 import { CircularProgress, Box, Typography } from '@mui/material';
 
 const PrivateRoute: React.FC<{ children: JSX.Element }> = ({ children }) => {
@@ -28,8 +28,9 @@ const App: React.FC = () => {
   useEffect(() => {
     const checkSystemStatus = async () => {
       try {
-        const response = await api.get('/mcp-server/status/initialized');
-        setIsSystemInitialized(response.data);
+        const response = await HttpService.get('/mcp-server/status/initialized');
+        console.log('System initialization status API response:', response);
+        setIsSystemInitialized(response);
       } catch (err) {
         console.error('Failed to fetch system initialization status:', err);
         setIsSystemInitialized(false);
