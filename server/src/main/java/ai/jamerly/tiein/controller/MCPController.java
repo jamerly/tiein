@@ -217,26 +217,15 @@ public class MCPController {
         }
     }
 
-    // MCPChatHistory
-    @GetMapping("/chat-history")
-    public ResponseEntity<ApiResponse<Page<MCPChatHistory>>> getAllChatHistory(Pageable pageable) {
-        Page<MCPChatHistory> chatHistory = mcpChatHistoryService.getChatHistory(pageable);
-        return ResponseEntity.ok(ApiResponse.success(chatHistory));
+    @PatchMapping("/chatbases/{id}/regenerate-appid")
+    public ResponseEntity<ApiResponse<MCPChatBase>> regenerateAppId(@PathVariable Long id) {
+        MCPChatBase updatedChatBase = mcpChatBaseService.regenerateAppId(id);
+        if (updatedChatBase != null) {
+            return ResponseEntity.ok(ApiResponse.success(updatedChatBase));
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(404, "ChatBase not found"));
+        }
     }
-
-    @GetMapping("/chat-history/chatbase/{chatBaseId}")
-    public ResponseEntity<ApiResponse<Page<MCPChatHistory>>> getChatHistoryByChatBaseId(@PathVariable Long chatBaseId, Pageable pageable) {
-        Page<MCPChatHistory> chatHistory = mcpChatHistoryService.getChatHistoryByChatBaseId(chatBaseId, pageable);
-        return ResponseEntity.ok(ApiResponse.success(chatHistory));
-    }
-
-    // Chat Interaction (Streaming)
-    @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> processChatMessage(@RequestBody ChatMessageRequest request) {
-        // For now, assuming userId is 1L (hardcoded for testing)
-        return mcpChatBaseService.processChatMessage(request.getChatBaseId(), 1L, request.getMessage());
-    }
-
     @GetMapping("/tools/count")
     public ResponseEntity<ApiResponse<Long>> getToolCount() {
         long count = mcpToolService.countTools();

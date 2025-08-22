@@ -4,12 +4,15 @@ import { Typography } from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { sendChatMessage } from '../services/chat';
+import { fetchWelcomeMessage } from '../services/chatbase';
 
 interface ChatDialogProps {
   open: boolean;
   onClose: () => void;
   chatBaseId: number;
   chatBaseName: string;
+  appId: string;
+  language: string;
 }
 
 interface Message {
@@ -17,7 +20,7 @@ interface Message {
   text: string;
 }
 
-const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chatBaseName }) => {
+const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chatBaseName, appId, language }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,8 +30,19 @@ const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chat
     if (open) {
       setMessages([]); // Clear messages when dialog opens
       setInput('');
+
+      const getWelcomeMessage = async () => {
+        try {
+          const welcomeMsg = await fetchWelcomeMessage(appId, language);
+          setMessages([{ type: 'ai', text: welcomeMsg }]);
+        } catch (error) {
+          console.error('Error fetching welcome message:', error);
+          // Do not render anything if there's an error
+        }
+      };
+      getWelcomeMessage();
     }
-  }, [open]);
+  }, [open, appId, language]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

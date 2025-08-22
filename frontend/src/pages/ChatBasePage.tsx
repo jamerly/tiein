@@ -8,7 +8,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'; // Import the new icon
 import { fetchGroups, type Group } from '../services/group';
-import { createChatBaseInstance, fetchChatBaseInstances, updateChatBaseInstance, deleteChatBaseInstance, updateChatBaseInstanceStatus, type ChatBaseInstance, type CreateChatBasePayload } from '../services/chatbase';
+import { createChatBaseInstance, fetchChatBaseInstances, updateChatBaseInstance, deleteChatBaseInstance, updateChatBaseInstanceStatus, regenerateAppId, type ChatBaseInstance, type CreateChatBasePayload } from '../services/chatbase';
 import { fetchChatHistory, fetchChatHistoryByChatBaseId, type ChatHistory } from '../services/chatHistory';
 import ChatDialog from '../components/ChatDialog'; // Import ChatDialog
 
@@ -49,6 +49,7 @@ function a11yProps(index: number) {
 const ChatBaseCreatePage: React.FC = () => {
   const [name, setName] = useState('');
   const [rolePrompt, setRolePrompt] = useState('');
+  const [greeting, setGreeting] = useState('');
   const [selectedGroups, setSelectedGroups] = useState<number[]>([]);
   const [availableGroups, setAvailableGroups] = useState<Group[]>([]);
 
@@ -78,6 +79,7 @@ const ChatBaseCreatePage: React.FC = () => {
     const payload: CreateChatBasePayload = {
       name,
       rolePrompt,
+      greeting,
       groupIds: selectedGroups,
     };
     try {
@@ -86,6 +88,7 @@ const ChatBaseCreatePage: React.FC = () => {
       // Optionally clear form or navigate
       setName('');
       setRolePrompt('');
+      setGreeting('');
       setSelectedGroups([]);
     } catch (error) {
       console.error('Error creating ChatBase:', error);
@@ -113,6 +116,15 @@ const ChatBaseCreatePage: React.FC = () => {
         variant="outlined"
         fullWidth
         required
+      />
+      <TextField
+        label="Greeting"
+        multiline
+        rows={3}
+        value={greeting}
+        onChange={(e) => setGreeting(e.target.value)}
+        variant="outlined"
+        fullWidth
       />
       <FormControl fullWidth>
         <InputLabel id="select-groups-label">Tool Groups</InputLabel>
@@ -156,6 +168,9 @@ const ChatBaseInstancesPage: React.FC = () => {
   const [currentInstanceToEdit, setCurrentInstanceToEdit] = useState<ChatBaseInstance | null>(null);
   const [editName, setEditName] = useState('');
   const [editRolePrompt, setEditRolePrompt] = useState('');
+  const [editGreeting, setEditGreeting] = useState('');
+  const [editAppId, setEditAppId] = useState('');
+  const [isGeneratingAppId, setIsGeneratingAppId] = useState(false);
   const [editSelectedGroups, setEditSelectedGroups] = useState<number[]>([]);
   const [availableGroups, setAvailableGroups] = useState<Group[]>([]);
 
@@ -229,6 +244,8 @@ const ChatBaseInstancesPage: React.FC = () => {
     setCurrentInstanceToEdit(instance);
     setEditName(instance.name);
     setEditRolePrompt(instance.rolePrompt);
+    setEditGreeting(instance.greeting);
+    setEditAppId(instance.appId);
     setEditSelectedGroups(instance.groupIds);
     setOpenEditDialog(true);
   };
@@ -246,6 +263,7 @@ const ChatBaseInstancesPage: React.FC = () => {
       ...currentInstanceToEdit,
       name: editName,
       rolePrompt: editRolePrompt,
+      greeting: editGreeting,
       groupIds: editSelectedGroups,
     };
 
@@ -267,6 +285,21 @@ const ChatBaseInstancesPage: React.FC = () => {
     setEditSelectedGroups(
       typeof value === 'string' ? value.split(',').map(Number) : value,
     );
+  };
+
+  const handleRegenerateAppId = async (id: number) => {
+    setIsGeneratingAppId(true);
+    try {
+      const updatedInstance = await regenerateAppId(id);
+      setEditAppId(updatedInstance.appId);
+      // Also update the instance in the main list to reflect the change
+      setInstances(instances.map(inst => inst.id === id ? { ...inst, appId: updatedInstance.appId } : inst));
+      loadInstances(); // Reload data
+    } catch (error) {
+      console.error('Error regenerating App ID:', error);
+    } finally {
+      setIsGeneratingAppId(false);
+    }
   };
 
   const handleRunChatBase = (instance: ChatBaseInstance) => {
@@ -396,6 +429,27 @@ const ChatBaseInstancesPage: React.FC = () => {
               fullWidth
               required
             />
+            <TextField
+              label="Greeting"
+              multiline
+              rows={3}
+              value={editGreeting}
+              onChange={(e) => setEditGreeting(e.target.value)}
+              variant="outlined"
+              fullWidth
+            />
+            <TextField
+              label="App ID"
+              value={editAppId}
+              variant="outlined"
+              fullWidth
+              InputProps={{
+                readOnly: true,
+              }}
+            />
+                        <Button onClick={() => handleRegenerateAppId(currentInstanceToEdit!.id)} disabled={isGeneratingAppId}>
+              {isGeneratingAppId ? 'Generating...' : 'Regenerate App ID'}
+            </Button>
             <FormControl fullWidth>
               <InputLabel id="edit-select-groups-label">Tool Groups</InputLabel>
               <Select
@@ -435,6 +489,8 @@ const ChatBaseInstancesPage: React.FC = () => {
           onClose={handleCloseChatDialog}
           chatBaseId={selectedChatBaseForChat.id}
           chatBaseName={selectedChatBaseForChat.name}
+          appId={selectedChatBaseForChat.appId}
+          language={navigator.language || "en-US"} // Use browser language or default to en-US
         />
       )}
     </Box>

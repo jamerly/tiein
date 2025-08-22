@@ -4,6 +4,6 @@ import lombok.Data;
 
 @Data
 public class ChatMessageRequest {
-    private Long chatBaseId;
+    private String sessionId;
     private String message;
 }

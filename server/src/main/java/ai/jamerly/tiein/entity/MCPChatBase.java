@@ -27,6 +27,12 @@ public class MCPChatBase {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String rolePrompt;
 
+    @Column(columnDefinition = "TEXT")
+    private String greeting;
+
+    @Column(length = 64, unique = true)
+    private String appId;
+
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private Status status = Status.ACTIVE; // Default status

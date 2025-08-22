@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer; // Import Customizer
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -16,6 +17,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration; // Import CorsConfiguration
+import org.springframework.web.cors.CorsConfigurationSource; // Import CorsConfigurationSource
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource; // Import UrlBasedCorsConfigurationSource
+
+import java.util.Arrays; // Import Arrays
 
 @Configuration
 @EnableWebSecurity
@@ -49,6 +55,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable) // Disable CSRF for API-only backend
+            .cors(Customizer.withDefaults()) // Enable CORS with default configuration
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(
                         "/user/register",
@@ -56,6 +63,8 @@ public class SecurityConfig {
                         "/mcp-server/status/initialized",
                         "/chat/openai",
                         "/mcp/chat",
+                        "/chatbases/init",
+                        "/chatbases/chat",
                         "/mcp-server/health", // Health check should be public
                         "/mcp-server/info" // Server info should be public
                 ).permitAll() // Allow registration, login, and public info without authentication
@@ -67,5 +76,17 @@ public class SecurityConfig {
             .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class); // Add JWT filter
 
         return http.build();
+    }
+
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList("*")); // Allow specific origin
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")); // Allow common HTTP methods
+        configuration.setAllowedHeaders(Arrays.asList("*")); // Allow all headers
+//        configuration.setAllowCredentials(true); // Allow credentials
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/chatbases/**", configuration); // Apply to all paths
+        return source;
     }
 }

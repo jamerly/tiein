@@ -10,6 +10,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import java.util.UUID;
+import java.util.stream.Collectors;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,8 +43,15 @@ public class MCPChatBaseService {
     }
 
     public MCPChatBase createChatBase(MCPChatBase chatBase) {
+        chatBase.setAppId(generateAppId());
         // groupIdsJson will be set by the entity's setGroupIds method
         return mcpChatBaseRepository.save(chatBase);
+    }
+
+    private String generateAppId() {
+        String uuid1 = UUID.randomUUID().toString().replace("-", "");
+        String uuid2 = UUID.randomUUID().toString().replace("-", "");
+        return (uuid1 + uuid2);
     }
 
     public MCPChatBase updateChatBase(Long id, MCPChatBase chatBaseDetails) {
@@ -49,6 +59,7 @@ public class MCPChatBaseService {
                 .map(chatBase -> {
                     chatBase.setName(chatBaseDetails.getName());
                     chatBase.setRolePrompt(chatBaseDetails.getRolePrompt());
+                    chatBase.setGreeting(chatBaseDetails.getGreeting());
                     chatBase.setStatus(chatBaseDetails.getStatus());
                     chatBase.setGroupIds(chatBaseDetails.getGroupIds()); // This will update groupIdsJson internally
                     return mcpChatBaseRepository.save(chatBase);
@@ -57,6 +68,14 @@ public class MCPChatBaseService {
 
     public void deleteChatBase(Long id) {
         mcpChatBaseRepository.deleteById(id);
+    }
+
+    public MCPChatBase regenerateAppId(Long id) {
+        return mcpChatBaseRepository.findById(id)
+                .map(chatBase -> {
+                    chatBase.setAppId(generateAppId());
+                    return mcpChatBaseRepository.save(chatBase);
+                }).orElse(null);
     }
 
     public MCPChatBase updateChatBaseStatus(Long id, MCPChatBase.Status status) {
@@ -69,6 +88,33 @@ public class MCPChatBaseService {
 
     public long countChatBases() {
         return mcpChatBaseRepository.count();
+    }
+
+    public MCPChatBase getChatBaseByAppId(String appId){
+        return  mcpChatBaseRepository.findByAppId(appId).orElse(null);
+    }
+    public String getWelcomeMessage(String appId, String language) {
+        Optional<MCPChatBase> chatBaseOptional = mcpChatBaseRepository.findByAppId(appId);
+        if (chatBaseOptional.isEmpty()) {
+            return "ChatBase not found.";
+        }
+        MCPChatBase chatBase = chatBaseOptional.get();
+
+        if (chatBase.getGreeting() == null || chatBase.getGreeting().isEmpty()) {
+            return "Welcome!"; // Default welcome if no greeting is set
+        }
+
+        String prompt = String.format("Translate the following greeting into %s and make it sound welcoming: \"%s\"", language, chatBase.getGreeting());
+
+        AIRequest aiRequest = new AIRequest();
+        aiRequest.setPrompt(prompt);
+        aiRequest.setModel("gpt-3.5-turbo"); // Or another appropriate model
+        aiRequest.setStream(Boolean.FALSE); // Not streaming for a single welcome message
+
+        // Invoke OpenAIRequestAssembler and block to get the result
+        // This is a simplified approach. For production, consider async handling or a dedicated AI service.
+        Flux<String> aiResponseFlux = openAIRequestAssembler.invoke(aiRequest);
+        return aiResponseFlux.collectList().block().stream().collect(Collectors.joining());
     }
 
     public Flux<String> processChatMessage(Long chatBaseId, Long userId, String userMessage) {
