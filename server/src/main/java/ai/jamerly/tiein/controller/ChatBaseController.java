@@ -8,6 +8,7 @@ import ai.jamerly.tiein.dto.ChatInitResponse;
 import ai.jamerly.tiein.dto.ChatMessageRequest;
 import ai.jamerly.tiein.entity.MCPChatBase;
 import ai.jamerly.tiein.service.MCPChatBaseService;
+import ai.jamerly.tiein.service.MCPChatHistoryService;
 import ai.jamerly.tiein.service.RedisService;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.internal.StringUtil;
@@ -37,6 +38,9 @@ public class ChatBaseController {
 
     @Autowired
     private WebClient.Builder webClientBuilder;
+
+    @Autowired
+    MCPChatHistoryService mcpChatHistoryService;
 
     @Autowired
     RedisService redisService;
@@ -86,6 +90,22 @@ public class ChatBaseController {
         chatInitResponse.setSessionId(finalSessionId);
         chatInitResponse.setMessage(welcomeMessage);
         return Mono.just(ResponseEntity.ok(ApiResponse.success(chatInitResponse)));
+    }
+
+    @GetMapping( value = "/char/history")
+    public Mono<ResponseEntity<ApiResponse<List<MCPChatHistory>>>> queryHistory(
+            @RequestHeader("X-App-Id") String appId,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader
+    ){
+        MCPChatBase mcpChatBase = mcpChatBaseService.getChatBaseByAppId(appId);
+        if (null == mcpChatBase) {
+            return Mono.just(
+                    ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body(ApiResponse.error(404, "ChatBase not found.")));
+        }
+        List<MCPChatHistory> histories = mcpChatHistoryService.queryBySessionId(sessionId);
+        return Mono.just(ResponseEntity.ok(ApiResponse.success(histories)));
     }
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> processChatMessage(@RequestHeader("X-App-Id") String appId,
