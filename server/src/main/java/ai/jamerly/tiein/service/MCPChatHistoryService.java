@@ -7,6 +7,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class MCPChatHistoryService {
 
@@ -19,6 +21,10 @@ public class MCPChatHistoryService {
 
     public Page<MCPChatHistory> getChatHistoryByChatBaseId(Long chatBaseId, Pageable pageable) {
         return mcpChatHistoryRepository.findByChatBaseId(chatBaseId, pageable);
+    }
+
+    public List<MCPChatHistory> queryBySessionId(String sessionId) {
+        return mcpChatHistoryRepository.findBySessionId(sessionId);
     }
 
     public MCPChatHistory createChatHistory(MCPChatHistory chatHistory) {

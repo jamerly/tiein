@@ -51,32 +51,4 @@ public class RedisService {
     public Boolean delete(String key) {
         return stringRedisTemplate.delete(key);
     }
-
-    /**
-     * Acquires a distributed lock using Redis.
-     *
-     * @param key The lock key.
-     * @param value The lock value (e.g., a unique request ID).
-     * @param timeout The lock expiration time.
-     * @param unit The time unit for the lock expiration.
-     * @return True if the lock was acquired, false otherwise.
-     */
-    public Boolean acquireLock(String key, String value, long timeout, TimeUnit unit) {
-        return stringRedisTemplate.opsForValue().setIfAbsent(key, value, timeout, unit);
-    }
-
-    /**
-     * Releases a distributed lock using Redis.
-     *
-     * @param key The lock key.
-     * @param value The lock value (must match the value used to acquire the lock).
-     * @return True if the lock was released, false otherwise.
-     */
-    public Boolean releaseLock(String key, String value) {
-        // Use a Lua script for atomic release to prevent releasing a lock set by another client
-        // or a lock that has expired and been re-acquired by another client.
-        String script = "if redis.call('get',KEYS[1]) == ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end";
-        Long result = stringRedisTemplate.execute((org.springframework.data.redis.core.script.RedisScript<Long>) org.springframework.data.redis.core.script.RedisScript.of(script, String.class), java.util.Collections.singletonList(key), value);
-        return result != null && result > 0;
-    }
 }

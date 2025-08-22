@@ -136,7 +136,7 @@ public class MCPChatBaseService {
         return initResult;
     }
 
-    public Flux<String> processChatMessage(Long chatBaseId, String userId, String userMessage, String userProfileJson) {
+    public Flux<String> processChatMessage(Long chatBaseId, String sessionId,String userId, String userMessage, String userProfileJson) {
         Optional<MCPChatBase> chatBaseOptional = mcpChatBaseRepository.findById(chatBaseId);
         if (chatBaseOptional.isEmpty()) {
             return Flux.just("Error: ChatBase not found.");
@@ -153,7 +153,8 @@ public class MCPChatBaseService {
         if(!StringUtil.isBlank(userProfileJson)){
             Map<String, Object> systemMessage = new HashMap<>();
             systemMessage.put("role", "system");
-            systemMessage.put("content", "User Profile is : " + userProfileJson);
+            systemMessage.put("content", "Visitor Profile is : " + userProfileJson);
+            historicalMessages.add(systemMessage);
         }
         // Add role prompt as a system message
         Map<String, Object> systemMessage = new HashMap<>();
@@ -161,6 +162,17 @@ public class MCPChatBaseService {
         String systemContent = chatBase.getRolePrompt();
         systemMessage.put("content", systemContent);
         historicalMessages.add(systemMessage);
+        List<MCPChatHistory> chatHistories = mcpChatHistoryService.queryBySessionId(sessionId);
+        for( int i=0;i<chatHistories.size();i++){
+            Map<String, Object> userMessageMap = new HashMap<>();
+            userMessageMap.put("role", "user");
+            userMessageMap.put("content", chatHistories.get(i).getUserMessage());
+            historicalMessages.add(userMessageMap);
+            Map<String, Object> assistantMessageMap = new HashMap<>();
+            assistantMessageMap.put("role", "assistant");
+            assistantMessageMap.put("content", chatHistories.get(i).getAiResponse());
+            historicalMessages.add(assistantMessageMap);
+        }
         // Add user message to historical messages (OpenAIRequestAssembler will also add it as prompt)
         Map<String, Object> userMsgMap = new HashMap<>();
         userMsgMap.put("role", "user");
@@ -176,7 +188,6 @@ public class MCPChatBaseService {
 
         // Invoke OpenAIRequestAssembler
         Flux<String> aiResponseFlux = openAIRequestAssembler.invoke(aiRequest);
-
         // Collect the full response for saving history, but return the Flux for streaming
         return aiResponseFlux.doOnComplete(() -> {
             // This block will execute when the Flux completes (i.e., full response received)
@@ -184,14 +195,25 @@ public class MCPChatBaseService {
             // For now, let's assume the history saving will be handled by a separate mechanism
             // or that the OpenAIRequestAssembler handles it internally if it's a tool call.
             // If you need to save the full AI response here, you'd need to collect it first.
-            // Example: aiResponseFlux.collectList().map(chunks -> String.join("", chunks)).subscribe(fullResponse -> {
-            //     MCPChatHistory chatHistory = new MCPChatHistory();
-            //     chatHistory.setChatBaseId(chatBaseId);
-            //     chatHistory.setUserId(userId);
-            //     chatHistory.setUserMessage(userMessage);
-            //     chatHistory.setAiResponse(fullResponse);
-            //     mcpChatHistoryService.createChatHistory(chatHistory);
-            // });
+            StringBuffer serverResponse = new StringBuffer();
+            aiResponseFlux.collectList().map(chunks -> {
+                for( int i = 0; i< chunks.size();i++){
+                    if( !"[DONE]".equals( chunks.get(i)) ) {
+                        JSONObject jsonObject = JSONObject.parseObject(chunks.get(i));
+                        serverResponse.append(jsonObject.getString("chunk"));
+                    }
+                }
+                return String.join("", chunks);
+            }).subscribe(fullResponse -> {
+                MCPChatHistory chatHistory = new MCPChatHistory();
+                chatHistory.setChatBaseId(chatBaseId);
+                chatHistory.setOuterUserId(userId);
+                chatHistory.setUserMessage(userMessage);
+                chatHistory.setSessionId(sessionId);
+                String message = serverResponse.toString();
+                chatHistory.setAiResponse(message);
+                mcpChatHistoryService.createChatHistory(chatHistory);
+            });
         });
     }
 }

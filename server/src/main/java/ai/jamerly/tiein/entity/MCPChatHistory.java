@@ -3,12 +3,13 @@ package ai.jamerly.tiein.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.query.sql.internal.ParameterRecognizerImpl;
 
 import java.time.LocalDateTime;
 
 @Data
 @Entity
-@Table(name = "mcp_chat_history")
+@Table(name = "chat_box_history")
 public class MCPChatHistory {
 
     @Id
@@ -18,9 +19,8 @@ public class MCPChatHistory {
     @Column(nullable = false)
     private Long chatBaseId;
 
-    @Column(nullable = false)
-    private Long userId; // Assuming a user ID is associated with the chat
-
+    @Column(nullable = false, columnDefinition = "VARCHAR(50)")
+    private String outerUserId;
     @Column(nullable = false, columnDefinition = "TEXT")
     private String userMessage;
 
@@ -31,8 +31,6 @@ public class MCPChatHistory {
     @Column(nullable = false, updatable = false)
     private LocalDateTime timestamp;
 
-    // Optional: Add a relationship to MCPChatBase if needed for more complex queries
-    // @ManyToOne
-    // @JoinColumn(name = "chatBaseId", insertable = false, updatable = false)
-    // private MCPChatBase chatBase;
+    @Column(nullable = false, columnDefinition = "VARCHAR(100)")
+    private String sessionId;
 }

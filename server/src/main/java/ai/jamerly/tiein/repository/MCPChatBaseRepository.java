@@ -9,4 +9,5 @@ import java.util.Optional;
 @Repository
 public interface MCPChatBaseRepository extends JpaRepository<MCPChatBase, Long> {
     Optional<MCPChatBase> findByAppId(String appId);
+
 }

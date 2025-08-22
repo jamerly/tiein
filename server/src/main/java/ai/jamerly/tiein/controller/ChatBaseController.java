@@ -1,6 +1,7 @@
 package ai.jamerly.tiein.controller;
 
 import ai.jamerly.tiein.dto.InitResult;
+import ai.jamerly.tiein.entity.MCPChatHistory;
 import ai.jamerly.tiein.repository.UserRepository;
 import ai.jamerly.tiein.dto.ApiResponse;
 import ai.jamerly.tiein.dto.ChatInitResponse;
@@ -16,6 +17,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
+
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -84,7 +87,6 @@ public class ChatBaseController {
         chatInitResponse.setMessage(welcomeMessage);
         return Mono.just(ResponseEntity.ok(ApiResponse.success(chatInitResponse)));
     }
-
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> processChatMessage(@RequestHeader("X-App-Id") String appId,
                                            @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
@@ -119,7 +121,11 @@ public class ChatBaseController {
         if( StringUtil.isBlank(userId)){
             return Flux.just("Error: System error");
         }
-        return mcpChatBaseService.processChatMessage(mcpChatBase.getId(), userId, request.getMessage(), userProfileJson);
+        redisService.set("chat_user_id:" + sessionId,
+                userId,1L,TimeUnit.DAYS
+        );
+        return mcpChatBaseService.processChatMessage(
+                mcpChatBase.getId(),sessionId, userId, request.getMessage(), userProfileJson);
     }
 
 }
