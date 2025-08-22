@@ -7,20 +7,20 @@ import ai.jamerly.tiein.dto.ChatInitResponse;
 import ai.jamerly.tiein.dto.ChatMessageRequest;
 import ai.jamerly.tiein.entity.MCPChatBase;
 import ai.jamerly.tiein.service.MCPChatBaseService;
-import com.alibaba.fastjson2.JSONObject;
+import ai.jamerly.tiein.service.RedisService;
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.internal.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
-
+import java.util.concurrent.TimeUnit;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @RestController
@@ -34,6 +34,10 @@ public class ChatBaseController {
 
     @Autowired
     private WebClient.Builder webClientBuilder;
+
+    @Autowired
+    RedisService redisService;
+
     @GetMapping("/init")
     public Mono<ResponseEntity<ApiResponse<ChatInitResponse>>> getChatBaseWelcomeMessage(
             @RequestHeader("X-App-Id") String appId,
@@ -66,16 +70,24 @@ public class ChatBaseController {
                 return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(HttpStatus.UNAUTHORIZED.value(), "Authorization failed")));
             }
         }
-
         InitResult initResult = mcpChatBaseService.getWelcomeMessage(appId, language, userProfile);
+        String welcomeMessage = initResult.getMessage();
+        String extractedUserId = initResult.getUserId();
+        if( !StringUtil.isBlank(extractedUserId)){
+            redisService.set("chat_user_id:" + finalSessionId,
+                    initResult.getUserId(),1L,TimeUnit.DAYS
+            );
+        }
+
         ChatInitResponse chatInitResponse = new ChatInitResponse();
         chatInitResponse.setSessionId(finalSessionId);
-        chatInitResponse.setMessage(initResult.getMessage());
+        chatInitResponse.setMessage(welcomeMessage);
         return Mono.just(ResponseEntity.ok(ApiResponse.success(chatInitResponse)));
     }
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> processChatMessage(@RequestHeader("X-App-Id") String appId,
+                                           @RequestHeader(value = "X-Session-Id", required = false) String sessionId,
                                            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
                                            @RequestBody ChatMessageRequest request) {
         MCPChatBase mcpChatBase = mcpChatBaseService.getChatBaseByAppId(appId);
@@ -103,10 +115,10 @@ public class ChatBaseController {
             }
         }
 
-        // For now, assuming userId is 1L (hardcoded for testing)
-        // We can get the user id from the user profile returned by the authUrl
-        Long userId = 1L; 
-
+        String userId = redisService.get("chat_user_id:" + sessionId);
+        if( StringUtil.isBlank(userId)){
+            return Flux.just("Error: System error");
+        }
         return mcpChatBaseService.processChatMessage(mcpChatBase.getId(), userId, request.getMessage(), userProfileJson);
     }
 

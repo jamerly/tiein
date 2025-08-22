@@ -109,7 +109,7 @@ public class MCPChatBaseService {
 
         String prompt = String.format("Given the user profile %s, " +
                 "translate the following greeting into %s and make it sound welcoming: \"%s\" using JSON format: " +
-                "```{ \"greeting\" : \"generated greeting\" , \"userId\": \"userId or username from userprofile\" }```", userProfileJson, language, chatBase.getGreeting());
+                "```{ \"greeting\" : \"generated greeting\" , \"userId\": \"userId or username from userprofile, if userprofile not exist will use -1 \" }```", userProfileJson, language, chatBase.getGreeting());
         AIRequest aiRequest = new AIRequest();
         aiRequest.setPrompt(prompt);
         aiRequest.setModel("gpt-3.5-turbo"); // Or another appropriate model
@@ -136,7 +136,7 @@ public class MCPChatBaseService {
         return initResult;
     }
 
-    public Flux<String> processChatMessage(Long chatBaseId, Long userId, String userMessage, String userProfileJson) {
+    public Flux<String> processChatMessage(Long chatBaseId, String userId, String userMessage, String userProfileJson) {
         Optional<MCPChatBase> chatBaseOptional = mcpChatBaseRepository.findById(chatBaseId);
         if (chatBaseOptional.isEmpty()) {
             return Flux.just("Error: ChatBase not found.");
