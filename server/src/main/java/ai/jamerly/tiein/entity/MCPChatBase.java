@@ -43,6 +43,12 @@ public class MCPChatBase {
     @Transient // This field will not be persisted in the database
     private List<Long> groupIds;
 
+    @Column(nullable = false)
+    private Boolean requireAuth = Boolean.FALSE; // default to false
+
+    @Column
+    private String authUrl;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

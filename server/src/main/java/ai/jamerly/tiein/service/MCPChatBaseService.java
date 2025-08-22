@@ -1,23 +1,23 @@
 package ai.jamerly.tiein.service;
 
+import ai.jamerly.tiein.dto.InitResult;
 import ai.jamerly.tiein.entity.MCPChatBase;
 import ai.jamerly.tiein.entity.MCPChatHistory;
 import ai.jamerly.tiein.repository.MCPChatBaseRepository;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.hibernate.mapping.Join;
+import org.jsoup.internal.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 @Service
 public class MCPChatBaseService {
@@ -61,6 +61,8 @@ public class MCPChatBaseService {
                     chatBase.setRolePrompt(chatBaseDetails.getRolePrompt());
                     chatBase.setGreeting(chatBaseDetails.getGreeting());
                     chatBase.setStatus(chatBaseDetails.getStatus());
+                    chatBase.setRequireAuth(chatBaseDetails.getRequireAuth());
+                    chatBase.setAuthUrl(chatBaseDetails.getAuthUrl());
                     chatBase.setGroupIds(chatBaseDetails.getGroupIds()); // This will update groupIdsJson internally
                     return mcpChatBaseRepository.save(chatBase);
                 }).orElse(null);
@@ -93,31 +95,48 @@ public class MCPChatBaseService {
     public MCPChatBase getChatBaseByAppId(String appId){
         return  mcpChatBaseRepository.findByAppId(appId).orElse(null);
     }
-    public String getWelcomeMessage(String appId, String language) {
+    public InitResult getWelcomeMessage(String appId, String language, String userProfileJson) {
         Optional<MCPChatBase> chatBaseOptional = mcpChatBaseRepository.findByAppId(appId);
+        InitResult initResult = new InitResult();
         if (chatBaseOptional.isEmpty()) {
-            return "ChatBase not found.";
+            initResult.setMessage("ChatBase not found.");
         }
         MCPChatBase chatBase = chatBaseOptional.get();
 
         if (chatBase.getGreeting() == null || chatBase.getGreeting().isEmpty()) {
-            return "Welcome!"; // Default welcome if no greeting is set
+            chatBase.setGreeting("Welcome");
         }
 
-        String prompt = String.format("Translate the following greeting into %s and make it sound welcoming: \"%s\"", language, chatBase.getGreeting());
-
+        String prompt = String.format("Given the user profile %s, " +
+                "translate the following greeting into %s and make it sound welcoming: \"%s\" using JSON format: " +
+                "```{ \"greeting\" : \"generated greeting\" , \"userId\": \"userId or username from userprofile\" }```", userProfileJson, language, chatBase.getGreeting());
         AIRequest aiRequest = new AIRequest();
         aiRequest.setPrompt(prompt);
         aiRequest.setModel("gpt-3.5-turbo"); // Or another appropriate model
         aiRequest.setStream(Boolean.FALSE); // Not streaming for a single welcome message
-
         // Invoke OpenAIRequestAssembler and block to get the result
         // This is a simplified approach. For production, consider async handling or a dedicated AI service.
         Flux<String> aiResponseFlux = openAIRequestAssembler.invoke(aiRequest);
-        return aiResponseFlux.collectList().block().stream().collect(Collectors.joining());
+        List<String> greetingJSON = aiResponseFlux.collectList().block().stream().map(t->{
+            if(!StringUtil.isBlank(t)){
+                if( "[DONE]".equals(t.trim()) ){
+                    return "";
+                }else{
+                    JSONObject jsonObject = JSONObject.parseObject(t.trim());
+                    return jsonObject.getString("chunk");
+                }
+            }
+            return "";
+        }).collect(Collectors.toList());
+        String JSONString =  greetingJSON.stream().collect(Collectors.joining());
+        JSONObject greeting = JSONObject.parseObject(JSONString);
+        initResult.setSuccess(Boolean.TRUE);
+        initResult.setUserId(greeting.getString("userId"));
+        initResult.setMessage(greeting.getString("greeting"));
+        return initResult;
     }
 
-    public Flux<String> processChatMessage(Long chatBaseId, Long userId, String userMessage) {
+    public Flux<String> processChatMessage(Long chatBaseId, Long userId, String userMessage, String userProfileJson) {
         Optional<MCPChatBase> chatBaseOptional = mcpChatBaseRepository.findById(chatBaseId);
         if (chatBaseOptional.isEmpty()) {
             return Flux.just("Error: ChatBase not found.");
@@ -131,12 +150,17 @@ public class MCPChatBaseService {
 
         List<Map<String, Object>> historicalMessages = new ArrayList<>();
 
+        if(!StringUtil.isBlank(userProfileJson)){
+            Map<String, Object> systemMessage = new HashMap<>();
+            systemMessage.put("role", "system");
+            systemMessage.put("content", "User Profile is : " + userProfileJson);
+        }
         // Add role prompt as a system message
         Map<String, Object> systemMessage = new HashMap<>();
         systemMessage.put("role", "system");
-        systemMessage.put("content", chatBase.getRolePrompt());
+        String systemContent = chatBase.getRolePrompt();
+        systemMessage.put("content", systemContent);
         historicalMessages.add(systemMessage);
-
         // Add user message to historical messages (OpenAIRequestAssembler will also add it as prompt)
         Map<String, Object> userMsgMap = new HashMap<>();
         userMsgMap.put("role", "user");
