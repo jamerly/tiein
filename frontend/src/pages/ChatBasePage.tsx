@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Tabs, Tab, Typography, FormControl, InputLabel, Select, MenuItem, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Switch, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination } from '@mui/material';
+import { Box, Tabs, Tab, Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Switch, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AddCircleOutlineOutlinedIcon from '@mui/icons-material/AddCircleOutlineOutlined';
 import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
-import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
+
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { fetchGroups, type Group } from '../services/group';
-import { createChatBaseInstance, fetchChatBaseInstances, updateChatBaseInstance, deleteChatBaseInstance, updateChatBaseInstanceStatus, regenerateAppId,queryChatBaseSessions, type ChatBaseInstance, type CreateChatBasePayload, type Session } from '../services/chatbase';
+import { createChatBaseInstance, fetchChatBaseInstances, updateChatBaseInstance, deleteChatBaseInstance, updateChatBaseInstanceStatus, queryChatBaseSessions, type ChatBaseInstance, type CreateChatBasePayload, type Session } from '../services/chatbase';
+
 import ChatDialog from '../components/ChatDialog'; // Import ChatDialog
 import ChatBaseForm from '../components/ChatBaseForm';
 
@@ -172,7 +173,7 @@ const SessionListForChatBase: React.FC<SessionListForChatBaseProps> = ({ chatBas
                   <TableCell>{session.userId}</TableCell>
                   <TableCell align="right">
                     <IconButton aria-label="view chat history" onClick={() => handleViewChatHistory(session)}>
-                      <HistoryOutlinedIcon />
+                      <StorageOutlinedIcon />
                     </IconButton>
                   </TableCell>
                 </TableRow>
@@ -298,10 +299,7 @@ const ChatBaseInstancesPage: React.FC = () => {
     setCurrentInstanceToEdit(null);
   };
 
-  const handleRunChatBase = (instance: ChatBaseInstance) => {
-    setSelectedChatBaseForChat(instance);
-    setOpenChatDialog(true);
-  };
+  
 
   const handleViewSessions = (instance: ChatBaseInstance) => {
     setSelectedChatBaseForSessions(instance);
@@ -377,7 +375,7 @@ const ChatBaseInstancesPage: React.FC = () => {
                   </TableCell>
                   <TableCell align="right">
                     <IconButton aria-label="view sessions" onClick={() => handleViewSessions(instance)}>
-                      <HistoryOutlinedIcon />
+                      <StorageOutlinedIcon />
                     </IconButton>
                     <IconButton aria-label="edit" onClick={() => handleEditClick(instance)}>
                       <EditIcon />
@@ -460,7 +458,7 @@ const ChatBaseInstancesPage: React.FC = () => {
         <DialogTitle>Sessions for {selectedChatBaseForSessions?.name}</DialogTitle>
         <DialogContent>
           {selectedChatBaseForSessions && (
-            <SessionListForChatBase chatBaseId={selectedChatBaseForSessions.id} />
+            <SessionListForChatBase chatBaseId={selectedChatBaseForSessions.id} chatBaseName={selectedChatBaseForSessions.name} appId={selectedChatBaseForSessions.appId} />
           )}
         </DialogContent>
         <DialogActions>
@@ -471,140 +469,7 @@ const ChatBaseInstancesPage: React.FC = () => {
   );
 };
 
-const ChatBaseHistoryPage: React.FC = () => {
-  const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
-  const [totalElements, setTotalElements] = useState(0);
-  const [selectedChatBaseId, setSelectedChatBaseId] = useState<number | ''>('');
-  const [availableChatBases, setAvailableChatBases] = useState<ChatBaseInstance[]>([]);
 
-  const loadChatHistory = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      let response = await queryChatBaseSessions(selectedChatBaseId as number, page, pageSize);
-      setChatHistory(response.content);
-      setTotalElements(response.totalElements);
-    } catch (err) {
-      console.error('Error fetching chat history:', err);
-      setError('Failed to load chat history.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadChatBases = async () => {
-    try {
-      const response = await fetchChatBaseInstances(0, 100); // Fetch all for dropdown
-      setAvailableChatBases(response.content);
-    } catch (error) {
-      console.error('Error fetching chat bases for history filter:', error);
-    }
-  };
-
-  useEffect(() => {
-    loadChatHistory();
-  }, [page, pageSize, selectedChatBaseId]);
-
-  useEffect(() => {
-    loadChatBases();
-  }, []);
-
-  const handlePageChange = (_event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleRowsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setPageSize(parseInt(event.target.value, 10));
-    setPage(0); // Reset to first page when page size changes
-  };
-
-  const handleChatBaseFilterChange = (event: any) => {
-    setSelectedChatBaseId(event.target.value as number | '');
-    setPage(0); // Reset to first page when filter changes
-  };
-
-  if (loading) return <Typography>Loading chat history...</Typography>;
-  if (error) return <Typography color="error">{error}</Typography>;
-
-  return (
-    <Box>
-      <Typography variant="h5" gutterBottom>ChatBase History</Typography>
-      <FormControl fullWidth sx={{ mb: 2 }}>
-        <InputLabel id="chatbase-filter-label">Filter by ChatBase</InputLabel>
-        <Select
-          labelId="chatbase-filter-label"
-          id="chatbase-filter"
-          value={selectedChatBaseId}
-          label="Filter by ChatBase"
-          onChange={handleChatBaseFilterChange}
-        >
-          <MenuItem value=""><em>All ChatBases</em></MenuItem>
-          {availableChatBases.map((chatBase) => (
-            <MenuItem key={chatBase.id} value={chatBase.id}>
-              {chatBase.name}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-
-      {chatHistory.length === 0 ? (
-        <Box sx={{ textAlign: 'center', mt: 4 }}>
-          <Typography variant="h6" color="textSecondary" gutterBottom>
-            No chat history found.
-          </Typography>
-          <Typography variant="body1" color="textSecondary" sx={{ mb: 2 }}>
-            There is no chat history for the selected ChatBase or overall.
-          </Typography>
-        </Box>
-      ) : (
-        <TableContainer component={Paper}>
-          <Table sx={{ minWidth: 650 }} aria-label="chat history table">
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>ChatBase Name</TableCell>
-                <TableCell>User Message</TableCell>
-                <TableCell>AI Response</TableCell>
-                <TableCell>Timestamp</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {chatHistory.map((record) => (
-                <TableRow
-                  key={record.id}
-                  sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                >
-                  <TableCell component="th" scope="row">
-                    {record.id}
-                  </TableCell>
-                  <TableCell>
-                    {availableChatBases.find(cb => cb.id === record.chatBaseId)?.name || `ID: ${record.chatBaseId}`}
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{record.userMessage}</TableCell>
-                  <TableCell sx={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{record.aiResponse}</TableCell>
-                  <TableCell>{new Date(record.timestamp).toLocaleString()}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
-            component="div"
-            count={totalElements}
-            rowsPerPage={pageSize}
-            page={page}
-            onPageChange={handlePageChange}
-            onRowsPerPageChange={handleRowsPerPageChange}
-          />
-        </TableContainer>
-      )}
-    </Box>
-  );
-};
 
 
 const ChatBasePage: React.FC = () => {
@@ -615,8 +480,6 @@ const ChatBasePage: React.FC = () => {
     switch (location.hash) {
       case '#instances':
         return 1;
-      case '#history':
-        return 2;
       case '#create':
       default:
         return 0;
@@ -646,9 +509,6 @@ const ChatBasePage: React.FC = () => {
       case 1:
         navigate('#instances');
         break;
-      case 2:
-        navigate('#history');
-        break;
       default:
         navigate('#create');
     }
@@ -666,16 +526,12 @@ const ChatBasePage: React.FC = () => {
       >
         <Tab label="Create" icon={<AddCircleOutlineOutlinedIcon />} {...a11yProps(0)} />
         <Tab label="Instances" icon={<StorageOutlinedIcon />} {...a11yProps(1)} />
-        <Tab label="History" icon={<HistoryOutlinedIcon />} {...a11yProps(2)} />
       </Tabs>
       <TabPanel value={value} index={0}>
         <ChatBaseCreatePage />
       </TabPanel>
       <TabPanel value={value} index={1}>
         <ChatBaseInstancesPage />
-      </TabPanel>
-      <TabPanel value={value} index={2}>
-        <ChatBaseHistoryPage />
       </TabPanel>
     </Box>
   );

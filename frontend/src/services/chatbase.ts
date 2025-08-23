@@ -14,7 +14,7 @@ export interface ChatBaseInstance {
   updatedAt: string;
 }
 
-export interface CreateChatBasePayload extends Omit<ChatBaseInstance, 'id' | 'status' | 'createdAt' | 'updatedAt'> {}
+export interface CreateChatBasePayload extends Omit<ChatBaseInstance, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'appId'> {}
 export interface UpdateChatBasePayload extends Omit<ChatBaseInstance, 'createdAt' | 'updatedAt'> {}
 
 export const fetchChatBaseInstances = async (page: number, pageSize: number): Promise<PagableResponse<ChatBaseInstance>> => {
