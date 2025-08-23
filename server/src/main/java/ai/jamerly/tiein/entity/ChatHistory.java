@@ -3,14 +3,15 @@ package ai.jamerly.tiein.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.query.sql.internal.ParameterRecognizerImpl;
 
 import java.time.LocalDateTime;
+import java.util.Date;
+import java.util.UUID;
 
 @Data
 @Entity
-@Table(name = "chat_box_history")
-public class MCPChatHistory {
+@Table(name = "chatbase_history")
+public class ChatHistory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,8 +30,8 @@ public class MCPChatHistory {
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private LocalDateTime timestamp;
+    private Date timestamp;
 
-    @Column(nullable = false, columnDefinition = "VARCHAR(100)")
-    private String sessionId;
+    @Column(nullable = false, updatable = false)
+    private UUID chatSessionId;
 }

@@ -9,12 +9,7 @@ export interface ChatHistory {
   timestamp: string;
 }
 
-export const fetchChatHistory = async (page: number, pageSize: number): Promise<PagableResponse<ChatHistory>> => {
-  const response = await HttpService.getPagable<ChatHistory>('/mcp/chat-history', page, pageSize);
-  return response;
-};
-
-export const fetchChatHistoryByChatBaseId = async (chatBaseId: number, page: number, pageSize: number): Promise<PagableResponse<ChatHistory>> => {
-  const response = await HttpService.getPagable<ChatHistory>(`/mcp/chat-history/chatbase/${chatBaseId}`, page, pageSize);
+export const fetchChatHistory = async (chatId:number,sessionId:string,page: number, pageSize: number): Promise<PagableResponse<ChatHistory>> => {
+  const response = await HttpService.getPagable<ChatHistory>(`/chatbases/${chatId}/sessions/${sessionId}/history`, page, pageSize);
   return response;
 };

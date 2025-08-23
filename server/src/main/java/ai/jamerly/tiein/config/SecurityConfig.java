@@ -62,9 +62,7 @@ public class SecurityConfig {
                         "/user/login",
                         "/mcp-server/status/initialized",
                         "/chat/openai",
-                        "/mcp/chat",
-                        "/chatbases/init",
-                        "/chatbases/chat",
+                        "/chatbases/client/*",
                         "/mcp-server/health", // Health check should be public
                         "/mcp-server/info" // Server info should be public
                 ).permitAll() // Allow registration, login, and public info without authentication
@@ -86,7 +84,7 @@ public class SecurityConfig {
         configuration.setAllowedHeaders(Arrays.asList("*")); // Allow all headers
 //        configuration.setAllowCredentials(true); // Allow credentials
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/chatbases/**", configuration); // Apply to all paths
+        source.registerCorsConfiguration("/chatbases/client/**", configuration); // Apply to all paths
         return source;
     }
 }

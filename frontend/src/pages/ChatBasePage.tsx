@@ -1,16 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Tabs, Tab, Typography, TextField, FormControl, InputLabel, Select, MenuItem, Checkbox, ListItemText, Button, OutlinedInput, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Switch, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination } from '@mui/material';
+import { Box, Tabs, Tab, Typography, FormControl, InputLabel, Select, MenuItem, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Switch, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AddCircleOutlineOutlinedIcon from '@mui/icons-material/AddCircleOutlineOutlined';
 import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow'; // Import the new icon
 import { fetchGroups, type Group } from '../services/group';
-import { createChatBaseInstance, fetchChatBaseInstances, updateChatBaseInstance, deleteChatBaseInstance, updateChatBaseInstanceStatus, regenerateAppId, type ChatBaseInstance, type CreateChatBasePayload } from '../services/chatbase';
-import { fetchChatHistory, fetchChatHistoryByChatBaseId, type ChatHistory } from '../services/chatHistory';
+import { createChatBaseInstance, fetchChatBaseInstances, updateChatBaseInstance, deleteChatBaseInstance, updateChatBaseInstanceStatus, regenerateAppId,queryChatBaseSessions, type ChatBaseInstance, type CreateChatBasePayload, type Session } from '../services/chatbase';
 import ChatDialog from '../components/ChatDialog'; // Import ChatDialog
+import ChatBaseForm from '../components/ChatBaseForm';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -47,10 +46,6 @@ function a11yProps(index: number) {
 }
 
 const ChatBaseCreatePage: React.FC = () => {
-  const [name, setName] = useState('');
-  const [rolePrompt, setRolePrompt] = useState('');
-  const [greeting, setGreeting] = useState('');
-  const [selectedGroups, setSelectedGroups] = useState<number[]>([]);
   const [availableGroups, setAvailableGroups] = useState<Group[]>([]);
 
   useEffect(() => {
@@ -65,31 +60,13 @@ const ChatBaseCreatePage: React.FC = () => {
     getGroups();
   }, []);
 
-  const handleGroupChange = (event: any) => {
-    const {
-      target: { value },
-    } = event;
-    setSelectedGroups(
-      typeof value === 'string' ? value.split(',').map(Number) : value,
-    );
-  };
-
-  const handleSubmit = async (_event: React.FormEvent) => {
-    _event.preventDefault();
-    const payload: CreateChatBasePayload = {
-      name,
-      rolePrompt,
-      greeting,
-      groupIds: selectedGroups,
-    };
+  const handleSubmit = async (payload: CreateChatBasePayload) => {
     try {
       await createChatBaseInstance(payload);
       alert('ChatBase created successfully!');
-      // Optionally clear form or navigate
-      setName('');
-      setRolePrompt('');
-      setGreeting('');
-      setSelectedGroups([]);
+      // How to reset form? The form state is in the child component.
+      // We can either lift the state up, or use a key to re-mount the component.
+      // For now, we can just leave it as it is.
     } catch (error) {
       console.error('Error creating ChatBase:', error);
       alert('Failed to create ChatBase.');
@@ -97,62 +74,135 @@ const ChatBaseCreatePage: React.FC = () => {
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="h5" gutterBottom>Create New ChatBase</Typography>
-      <TextField
-        label="Name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        variant="outlined"
-        fullWidth
-        required
+      <ChatBaseForm
+        isEdit={false}
+        onSubmit={handleSubmit}
+        availableGroups={availableGroups}
       />
-      <TextField
-        label="Role Prompt"
-        multiline
-        rows={6}
-        value={rolePrompt}
-        onChange={(e) => setRolePrompt(e.target.value)}
-        variant="outlined"
-        fullWidth
-        required
-      />
-      <TextField
-        label="Greeting"
-        multiline
-        rows={3}
-        value={greeting}
-        onChange={(e) => setGreeting(e.target.value)}
-        variant="outlined"
-        fullWidth
-      />
-      <FormControl fullWidth>
-        <InputLabel id="select-groups-label">Tool Groups</InputLabel>
-        <Select
-          labelId="select-groups-label"
-          id="select-groups"
-          multiple
-          value={selectedGroups}
-          onChange={handleGroupChange}
-          input={<OutlinedInput label="Tool Groups" />}
-          renderValue={(selected) => {
-            const selectedNames = availableGroups
-              .filter(group => selected.includes(group.id))
-              .map(group => group.name);
-            return selectedNames.join(', ');
-          }}
-        >
-          {availableGroups.map((group) => (
-            <MenuItem key={group.id} value={group.id}>
-              <Checkbox checked={selectedGroups.indexOf(group.id) > -1} />
-              <ListItemText primary={group.name} />
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-      <Button type="submit" variant="contained" color="primary" sx={{ mt: 2 }}>
-        Create ChatBase
-      </Button>
+    </Box>
+  );
+};
+
+interface SessionListForChatBaseProps {
+  chatBaseId: number;
+  chatBaseName: string; // Added
+  appId: string; // Added
+}
+
+const SessionListForChatBase: React.FC<SessionListForChatBaseProps> = ({ chatBaseId, chatBaseName, appId }) => { // Destructure new props
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalElements, setTotalElements] = useState(0);
+
+  const [openChatDialogForHistory, setOpenChatDialogForHistory] = useState(false); // Renamed state
+  const [selectedSessionForHistory, setSelectedSessionForHistory] = useState<Session | null>(null);
+
+  const loadSessions = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await queryChatBaseSessions(chatBaseId, page, pageSize);
+      setSessions(response.content);
+      setTotalElements(response.totalElements);
+    } catch (err) {
+      console.error('Error fetching sessions:', err);
+      setError('Failed to load sessions.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSessions();
+  }, [chatBaseId, page, pageSize]);
+
+  const handlePageChange = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleRowsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setPageSize(parseInt(event.target.value, 10));
+    setPage(0); // Reset to first page when page size changes
+  };
+
+  const handleViewChatHistory = (session: Session) => {
+    setSelectedSessionForHistory(session);
+    setOpenChatDialogForHistory(true);
+  };
+
+  if (loading) return <Typography>Loading sessions...</Typography>;
+  if (error) return <Typography color="error">{error}</Typography>;
+
+  return (
+    <Box>
+      {sessions.length === 0 ? (
+        <Box sx={{ textAlign: 'center', mt: 4 }}>
+          <Typography variant="h6" color="textSecondary" gutterBottom>
+            No sessions found for this ChatBase.
+          </Typography>
+        </Box>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table sx={{ minWidth: 650 }} aria-label="sessions table">
+            <TableHead>
+              <TableRow>
+                <TableCell>ID</TableCell>
+                <TableCell>Title</TableCell>
+                <TableCell>Start Time</TableCell>
+                <TableCell>User ID</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {sessions.map((session) => (
+                <TableRow
+                  key={session.id}
+                  sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                >
+                  <TableCell component="th" scope="row">
+                    {session.id}
+                  </TableCell>
+                  <TableCell sx={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session.title || 'N/A'}</TableCell>
+                  <TableCell>{new Date(session.startTime).toLocaleString()}</TableCell>
+                  <TableCell>{session.userId}</TableCell>
+                  <TableCell align="right">
+                    <IconButton aria-label="view chat history" onClick={() => handleViewChatHistory(session)}>
+                      <HistoryOutlinedIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={totalElements}
+            rowsPerPage={pageSize}
+            page={page}
+            onPageChange={handlePageChange}
+            onRowsPerPageChange={handleRowsPerPageChange}
+          />
+        </TableContainer>
+      )}
+
+      {/* Chat Dialog for History */}
+      {selectedSessionForHistory && (
+        <ChatDialog
+          open={openChatDialogForHistory}
+          onClose={() => setOpenChatDialogForHistory(false)}
+          chatBaseId={chatBaseId}
+          chatBaseName={chatBaseName}
+          appId={appId}
+          language={navigator.language || "en-US"}
+          chatSessionId={selectedSessionForHistory.id} // Pass sessionId
+        />
+      )}
     </Box>
   );
 };
@@ -166,17 +216,15 @@ const ChatBaseInstancesPage: React.FC = () => {
   const [totalElements, setTotalElements] = useState(0);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [currentInstanceToEdit, setCurrentInstanceToEdit] = useState<ChatBaseInstance | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editRolePrompt, setEditRolePrompt] = useState('');
-  const [editGreeting, setEditGreeting] = useState('');
-  const [editAppId, setEditAppId] = useState('');
-  const [isGeneratingAppId, setIsGeneratingAppId] = useState(false);
-  const [editSelectedGroups, setEditSelectedGroups] = useState<number[]>([]);
   const [availableGroups, setAvailableGroups] = useState<Group[]>([]);
 
   // State for Chat Dialog
   const [openChatDialog, setOpenChatDialog] = useState(false);
   const [selectedChatBaseForChat, setSelectedChatBaseForChat] = useState<ChatBaseInstance | null>(null);
+
+  // State for Sessions Dialog
+  const [openSessionsDialog, setOpenSessionsDialog] = useState(false);
+  const [selectedChatBaseForSessions, setSelectedChatBaseForSessions] = useState<ChatBaseInstance | null>(null);
 
   const loadInstances = async () => {
     setLoading(true);
@@ -242,11 +290,6 @@ const ChatBaseInstancesPage: React.FC = () => {
 
   const handleEditClick = (instance: ChatBaseInstance) => {
     setCurrentInstanceToEdit(instance);
-    setEditName(instance.name);
-    setEditRolePrompt(instance.rolePrompt);
-    setEditGreeting(instance.greeting);
-    setEditAppId(instance.appId);
-    setEditSelectedGroups(instance.groupIds);
     setOpenEditDialog(true);
   };
 
@@ -255,56 +298,14 @@ const ChatBaseInstancesPage: React.FC = () => {
     setCurrentInstanceToEdit(null);
   };
 
-  const handleEditSubmit = async (_event: React.FormEvent) => {
-    _event.preventDefault();
-    if (!currentInstanceToEdit) return;
-
-    const payload = {
-      ...currentInstanceToEdit,
-      name: editName,
-      rolePrompt: editRolePrompt,
-      greeting: editGreeting,
-      groupIds: editSelectedGroups,
-    };
-
-    try {
-      await updateChatBaseInstance(currentInstanceToEdit.id, payload);
-      alert('ChatBase instance updated successfully!');
-      handleEditDialogClose();
-      loadInstances(); // Reload data
-    } catch (err) {
-      console.error(`Error updating instance ${currentInstanceToEdit.id}:`, err);
-      alert('Failed to update ChatBase instance.');
-    }
-  };
-
-  const handleEditGroupChange = (event: any) => {
-    const {
-      target: { value },
-    } = event;
-    setEditSelectedGroups(
-      typeof value === 'string' ? value.split(',').map(Number) : value,
-    );
-  };
-
-  const handleRegenerateAppId = async (id: number) => {
-    setIsGeneratingAppId(true);
-    try {
-      const updatedInstance = await regenerateAppId(id);
-      setEditAppId(updatedInstance.appId);
-      // Also update the instance in the main list to reflect the change
-      setInstances(instances.map(inst => inst.id === id ? { ...inst, appId: updatedInstance.appId } : inst));
-      loadInstances(); // Reload data
-    } catch (error) {
-      console.error('Error regenerating App ID:', error);
-    } finally {
-      setIsGeneratingAppId(false);
-    }
-  };
-
   const handleRunChatBase = (instance: ChatBaseInstance) => {
     setSelectedChatBaseForChat(instance);
     setOpenChatDialog(true);
+  };
+
+  const handleViewSessions = (instance: ChatBaseInstance) => {
+    setSelectedChatBaseForSessions(instance);
+    setOpenSessionsDialog(true);
   };
 
   const handleCloseChatDialog = () => {
@@ -346,7 +347,6 @@ const ChatBaseInstancesPage: React.FC = () => {
               <TableRow>
                 <TableCell>ID</TableCell>
                 <TableCell>Name</TableCell>
-                <TableCell>Role Prompt</TableCell>
                 <TableCell>Groups</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
@@ -362,7 +362,7 @@ const ChatBaseInstancesPage: React.FC = () => {
                     {instance.id}
                   </TableCell>
                   <TableCell>{instance.name}</TableCell>
-                  <TableCell sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{instance.rolePrompt}</TableCell>
+                  
                   <TableCell>
                     {instance.groupIds.map(id => availableGroups.find(g => g.id === id)?.name).filter(Boolean).join(', ')}
                   </TableCell>
@@ -376,12 +376,8 @@ const ChatBaseInstancesPage: React.FC = () => {
                     {instance.status.toUpperCase()}
                   </TableCell>
                   <TableCell align="right">
-                    <IconButton
-                      aria-label="run"
-                      onClick={() => handleRunChatBase(instance)}
-                      disabled={instance.status.toLowerCase() !== 'active'} // Enabled only if status is active
-                    >
-                      <PlayArrowIcon />
+                    <IconButton aria-label="view sessions" onClick={() => handleViewSessions(instance)}>
+                      <HistoryOutlinedIcon />
                     </IconButton>
                     <IconButton aria-label="edit" onClick={() => handleEditClick(instance)}>
                       <EditIcon />
@@ -410,75 +406,40 @@ const ChatBaseInstancesPage: React.FC = () => {
       <Dialog open={openEditDialog} onClose={handleEditDialogClose} fullWidth maxWidth="md">
         <DialogTitle>Edit ChatBase Instance</DialogTitle>
         <DialogContent>
-          <Box component="form" onSubmit={handleEditSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-            <TextField
-              label="Name"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              variant="outlined"
-              fullWidth
-              required
-            />
-            <TextField
-              label="Role Prompt"
-              multiline
-              rows={6}
-              value={editRolePrompt}
-              onChange={(e) => setEditRolePrompt(e.target.value)}
-              variant="outlined"
-              fullWidth
-              required
-            />
-            <TextField
-              label="Greeting"
-              multiline
-              rows={3}
-              value={editGreeting}
-              onChange={(e) => setEditGreeting(e.target.value)}
-              variant="outlined"
-              fullWidth
-            />
-            <TextField
-              label="App ID"
-              value={editAppId}
-              variant="outlined"
-              fullWidth
-              InputProps={{
-                readOnly: true,
+          {currentInstanceToEdit && (
+            <ChatBaseForm
+              isEdit={true}
+              initialData={currentInstanceToEdit}
+              onSubmit={(payload) => {
+                if (!currentInstanceToEdit) return;
+                const newPayload: CreateChatBasePayload = {
+                  name: payload.name,
+                  rolePrompt: payload.rolePrompt,
+                  greeting: payload.greeting,
+                  groupIds: payload.groupIds,
+                  requireAuth: payload.requireAuth,
+                  authUrl: payload.authUrl,
+                };
+                updateChatBaseInstance(currentInstanceToEdit.id, {
+                  ...currentInstanceToEdit,
+                  ...newPayload,
+                })
+                  .then(() => {
+                    alert('ChatBase instance updated successfully!');
+                    handleEditDialogClose();
+                    loadInstances(); // Reload data
+                  })
+                  .catch((err) => {
+                    console.error(`Error updating instance ${currentInstanceToEdit.id}:`, err);
+                    alert('Failed to update ChatBase instance.');
+                  });
               }}
+              availableGroups={availableGroups}
             />
-                        <Button onClick={() => handleRegenerateAppId(currentInstanceToEdit!.id)} disabled={isGeneratingAppId}>
-              {isGeneratingAppId ? 'Generating...' : 'Regenerate App ID'}
-            </Button>
-            <FormControl fullWidth>
-              <InputLabel id="edit-select-groups-label">Tool Groups</InputLabel>
-              <Select
-                labelId="edit-select-groups-label"
-                id="edit-select-groups"
-                multiple
-                value={editSelectedGroups}
-                onChange={handleEditGroupChange}
-                input={<OutlinedInput label="Tool Groups" />}
-                renderValue={(selected) => {
-                  const selectedNames = availableGroups
-                    .filter(group => selected.includes(group.id))
-                    .map(group => group.name);
-                  return selectedNames.join(', ');
-                }}
-              >
-                {availableGroups.map((group) => (
-                  <MenuItem key={group.id} value={group.id}>
-                    <Checkbox checked={editSelectedGroups.indexOf(group.id) > -1} />
-                    <ListItemText primary={group.name} />
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleEditDialogClose}>Cancel</Button>
-          <Button onClick={handleEditSubmit} variant="contained" color="primary">Save Changes</Button>
         </DialogActions>
       </Dialog>
 
@@ -493,6 +454,19 @@ const ChatBaseInstancesPage: React.FC = () => {
           language={navigator.language || "en-US"} // Use browser language or default to en-US
         />
       )}
+
+      {/* Sessions Dialog */}
+      <Dialog open={openSessionsDialog} onClose={() => setOpenSessionsDialog(false)} fullWidth maxWidth="lg">
+        <DialogTitle>Sessions for {selectedChatBaseForSessions?.name}</DialogTitle>
+        <DialogContent>
+          {selectedChatBaseForSessions && (
+            <SessionListForChatBase chatBaseId={selectedChatBaseForSessions.id} />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenSessionsDialog(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
@@ -511,12 +485,7 @@ const ChatBaseHistoryPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      let response;
-      if (selectedChatBaseId) {
-        response = await fetchChatHistoryByChatBaseId(selectedChatBaseId as number, page, pageSize);
-      } else {
-        response = await fetchChatHistory(page, pageSize);
-      }
+      let response = await queryChatBaseSessions(selectedChatBaseId as number, page, pageSize);
       setChatHistory(response.content);
       setTotalElements(response.totalElements);
     } catch (err) {

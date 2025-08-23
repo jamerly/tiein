@@ -1,7 +1,12 @@
 package ai.jamerly.tiein.controller;
 
 import ai.jamerly.tiein.dto.ApiResponse;
+import ai.jamerly.tiein.dto.ChatMessageRequest;
+import ai.jamerly.tiein.entity.ChatSession;
+import ai.jamerly.tiein.entity.ChatHistory;
 import ai.jamerly.tiein.service.AIRequest;
+import ai.jamerly.tiein.service.ChatSessionService;
+import ai.jamerly.tiein.service.ChatHistoryService;
 import ai.jamerly.tiein.service.OpenAIRequestAssembler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,14 +17,22 @@ import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
+import java.util.Optional;
+
 @RestController
 @RequestMapping("/chat")
-public class ChatController {
+public class OldChatController {
 
-    private static final Logger logger = LoggerFactory.getLogger(ChatController.class);
+    private static final Logger logger = LoggerFactory.getLogger(OldChatController.class);
 
     @Autowired
     private OpenAIRequestAssembler openAIRequestAssembler;
+
+    @Autowired
+    private ChatSessionService chatSessionService;
+
+    @Autowired
+    private ChatHistoryService chatHistoryService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -51,5 +64,5 @@ public class ChatController {
                             .build());
                 });
     }
-}
 
+}

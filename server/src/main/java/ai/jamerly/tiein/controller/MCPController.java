@@ -1,14 +1,12 @@
 package ai.jamerly.tiein.controller;
 
 import ai.jamerly.tiein.dto.ApiResponse;
-import ai.jamerly.tiein.dto.ChatMessageRequest;
 import ai.jamerly.tiein.entity.MCPChatBase;
-import ai.jamerly.tiein.entity.MCPChatHistory;
 import ai.jamerly.tiein.entity.MCPPrompt;
 import ai.jamerly.tiein.entity.MCPResource;
 import ai.jamerly.tiein.entity.MCPTool;
-import ai.jamerly.tiein.service.MCPChatBaseService;
-import ai.jamerly.tiein.service.MCPChatHistoryService;
+import ai.jamerly.tiein.service.ChatBaseService;
+import ai.jamerly.tiein.service.ChatHistoryService;
 import ai.jamerly.tiein.service.MCPPromptService;
 import ai.jamerly.tiein.service.MCPResourceService;
 import ai.jamerly.tiein.service.MCPToolService;
@@ -16,10 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -37,10 +33,10 @@ public class MCPController {
     private MCPPromptService mcpPromptService;
 
     @Autowired
-    private MCPChatBaseService mcpChatBaseService;
+    private ChatBaseService chatBaseService;
 
     @Autowired
-    private MCPChatHistoryService mcpChatHistoryService;
+    private ChatHistoryService chatHistoryService;
 
     // MCPTool CRUD
     @GetMapping("/tools")
@@ -170,62 +166,6 @@ public class MCPController {
         mcpPromptService.deletePrompt(id);
         return ResponseEntity.ok(ApiResponse.success("Prompt deleted successfully"));
     }
-
-    // MCPChatBase CRUD
-    @GetMapping("/chatbases")
-    public ResponseEntity<ApiResponse<Page<MCPChatBase>>> getAllChatBases(Pageable pageable) {
-        Page<MCPChatBase> chatBases = mcpChatBaseService.getAllChatBases(pageable);
-        return ResponseEntity.ok(ApiResponse.success(chatBases));
-    }
-
-    @GetMapping("/chatbases/{id}")
-    public ResponseEntity<ApiResponse<MCPChatBase>> getChatBaseById(@PathVariable Long id) {
-        return mcpChatBaseService.getChatBaseById(id)
-                .map(chatBase -> ResponseEntity.ok(ApiResponse.success(chatBase)))
-                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(404, "ChatBase not found")));
-    }
-
-    @PostMapping("/chatbases")
-    public ResponseEntity<ApiResponse<MCPChatBase>> createChatBase(@RequestBody MCPChatBase chatBase) {
-        MCPChatBase createdChatBase = mcpChatBaseService.createChatBase(chatBase);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(createdChatBase));
-    }
-
-    @PutMapping("/chatbases/{id}")
-    public ResponseEntity<ApiResponse<MCPChatBase>> updateChatBase(@PathVariable Long id, @RequestBody MCPChatBase chatBase) {
-        MCPChatBase updatedChatBase = mcpChatBaseService.updateChatBase(id, chatBase);
-        if (updatedChatBase != null) {
-            return ResponseEntity.ok(ApiResponse.success(updatedChatBase));
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(404, "ChatBase not found"));
-        }
-    }
-
-    @DeleteMapping("/chatbases/{id}")
-    public ResponseEntity<ApiResponse<String>> deleteChatBase(@PathVariable Long id) {
-        mcpChatBaseService.deleteChatBase(id);
-        return ResponseEntity.ok(ApiResponse.success("ChatBase deleted successfully"));
-    }
-
-    @PatchMapping("/chatbases/{id}/status")
-    public ResponseEntity<ApiResponse<MCPChatBase>> updateChatBaseStatus(@PathVariable Long id, @RequestBody MCPChatBase chatBase) {
-        MCPChatBase updatedChatBase = mcpChatBaseService.updateChatBaseStatus(id, chatBase.getStatus());
-        if (updatedChatBase != null) {
-            return ResponseEntity.ok(ApiResponse.success(updatedChatBase));
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(404, "ChatBase not found"));
-        }
-    }
-
-    @PatchMapping("/chatbases/{id}/regenerate-appid")
-    public ResponseEntity<ApiResponse<MCPChatBase>> regenerateAppId(@PathVariable Long id) {
-        MCPChatBase updatedChatBase = mcpChatBaseService.regenerateAppId(id);
-        if (updatedChatBase != null) {
-            return ResponseEntity.ok(ApiResponse.success(updatedChatBase));
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(404, "ChatBase not found"));
-        }
-    }
     @GetMapping("/tools/count")
     public ResponseEntity<ApiResponse<Long>> getToolCount() {
         long count = mcpToolService.countTools();
@@ -246,7 +186,7 @@ public class MCPController {
 
     @GetMapping("/chatbases/count")
     public ResponseEntity<ApiResponse<Long>> getChatBaseCount() {
-        long count = mcpChatBaseService.countChatBases();
+        long count = chatBaseService.countChatBases();
         return ResponseEntity.ok(ApiResponse.success(count));
     }
 }

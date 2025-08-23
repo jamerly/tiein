@@ -3,8 +3,10 @@ package ai.jamerly.tiein.controller;
 import ai.jamerly.tiein.dto.ChangePasswordRequest;
 import ai.jamerly.tiein.dto.LoginRequest;
 import ai.jamerly.tiein.dto.ApiResponse;
+import ai.jamerly.tiein.dto.UserResponse;
 import ai.jamerly.tiein.entity.User;
 import ai.jamerly.tiein.service.UserService;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -117,10 +119,14 @@ public class UserController {
     }
 
     @GetMapping("/profile")
-    public ResponseEntity<ApiResponse<ai.jamerly.tiein.entity.User>> getUserProfile() {
+    public ResponseEntity<ApiResponse<UserResponse>> getUserProfile() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return userService.findByUsername(username)
-                .map(user -> ResponseEntity.ok(ApiResponse.success(user)))
+                .map(user -> {
+                    UserResponse userResponse = new UserResponse();
+                    BeanUtils.copyProperties(userResponse,userResponse);
+                    return ResponseEntity.ok(ApiResponse.success(userResponse));
+                })
                 .orElse(ResponseEntity.status(404).body(ApiResponse.error(404, "User profile not found.")));
     }
 }

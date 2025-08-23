@@ -4,8 +4,8 @@ import { Typography } from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { sendChatMessage } from '../services/chat';
-import { fetchWelcomeMessage } from '../services/chatbase';
 
+import { fetchChatHistory } from '../services/chatHistory';
 interface ChatDialogProps {
   open: boolean;
   onClose: () => void;
@@ -13,6 +13,7 @@ interface ChatDialogProps {
   chatBaseName: string;
   appId: string;
   language: string;
+  chatSessionId: string; // Added chatSessionId
 }
 
 interface Message {
@@ -20,7 +21,7 @@ interface Message {
   text: string;
 }
 
-const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chatBaseName, appId, language }) => {
+const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chatBaseName, appId, language, chatSessionId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,18 +32,22 @@ const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chat
       setMessages([]); // Clear messages when dialog opens
       setInput('');
 
-      const getWelcomeMessage = async () => {
+      const loadChatHistory = async () => {
         try {
-          const welcomeMsg = await fetchWelcomeMessage(appId, language);
-          setMessages([{ type: 'ai', text: welcomeMsg }]);
+          const historyResponse = await fetchChatHistory(chatBaseId, chatSessionId, 0, 20); // Fetch first page
+          const loadedMessages: any = historyResponse.content.map(historyItem => ([
+            { type: 'user', text: historyItem.userMessage },
+            { type: 'ai', text: historyItem.aiResponse }
+          ])).flat();
+          setMessages(loadedMessages);
         } catch (error) {
-          console.error('Error fetching welcome message:', error);
-          // Do not render anything if there's an error
+          console.error('Error loading chat history:', error);
+          // Optionally, display an error message to the user
         }
       };
-      getWelcomeMessage();
+      loadChatHistory();
     }
-  }, [open, appId, language]);
+  }, [open, appId, language, chatBaseId, chatSessionId]); // Added chatBaseId and chatSessionId to dependencies
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -102,13 +107,18 @@ const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chat
         //   return newMessages;
         // });
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
-      setMessages((prevMessages) => {
-        const newMessages = [...prevMessages];
-        newMessages[newMessages.length - 1] = { type: 'ai', text: 'Error: Could not get a response.' };
-        return newMessages;
-      });
+      if (error.response && error.response.status === 401) {
+        alert('Authentication required. Please login.');
+        onClose();
+      } else {
+        setMessages((prevMessages) => {
+          const newMessages = [...prevMessages];
+          newMessages[newMessages.length - 1] = { type: 'ai', text: 'Error: Could not get a response.' };
+          return newMessages;
+        });
+      }
       setLoading(false);
     }
   };
@@ -151,27 +161,6 @@ const ChatDialog: React.FC<ChatDialogProps> = ({ open, onClose, chatBaseId, chat
         </Box>
         {loading && <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>AI is typing...</Typography>}
       </DialogContent>
-      <DialogActions sx={{ p: 2, flexDirection: 'column', alignItems: 'stretch' }}>
-        <TextField
-          fullWidth
-          multiline
-          rows={2}
-          variant="outlined"
-          placeholder="Type your message..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
-          sx={{ mb: 1 }}
-        />
-        <Button
-          fullWidth
-          variant="contained"
-          onClick={handleSendMessage}
-          disabled={loading || input.trim() === ''}
-        >
-          Send
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 };

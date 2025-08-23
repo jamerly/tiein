@@ -1,35 +1,36 @@
 package ai.jamerly.tiein.service;
 
 import ai.jamerly.tiein.dto.InitResult;
+import ai.jamerly.tiein.entity.ChatHistory;
 import ai.jamerly.tiein.entity.MCPChatBase;
-import ai.jamerly.tiein.entity.MCPChatHistory;
+import ai.jamerly.tiein.entity.ChatSession; // Added
 import ai.jamerly.tiein.repository.MCPChatBaseRepository;
-import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.hibernate.mapping.Join;
 import org.jsoup.internal.StringUtil;
+import org.slf4j.Logger; // Added
+import org.slf4j.LoggerFactory; // Added
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
 import reactor.core.publisher.Flux;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-public class MCPChatBaseService {
+public class ChatBaseService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ChatBaseService.class);
 
     @Autowired
     private MCPChatBaseRepository mcpChatBaseRepository;
+    @Autowired
+    private ChatHistoryService mcpChatHistoryService; // Changed from ChatHistoryService
 
     @Autowired
-    private ObjectMapper objectMapper; // Keep for potential future use or other JSON operations
-
-    @Autowired
-    private MCPChatHistoryService mcpChatHistoryService;
+    private ChatSessionService chatSessionService; // Added
 
     @Autowired
     private OpenAIRequestAssembler openAIRequestAssembler;
@@ -107,9 +108,9 @@ public class MCPChatBaseService {
             chatBase.setGreeting("Welcome");
         }
 
-        String prompt = String.format("Given the user profile %s, " +
-                "translate the following greeting into %s and make it sound welcoming: \"%s\" using JSON format: " +
-                "```{ \"greeting\" : \"generated greeting\" , \"userId\": \"userId or username from userprofile, if userprofile not exist will use -1 \" }```", userProfileJson, language, chatBase.getGreeting());
+        String prompt = String.format("Given the user profile %s.\n " +
+                "Write a friendly welcoming greeting in %s for \"%s\" and provide the result in JSON format. " +
+                "```{\"greeting\" : \"generated greeting\"  }```", userProfileJson, language, chatBase.getGreeting());
         AIRequest aiRequest = new AIRequest();
         aiRequest.setPrompt(prompt);
         aiRequest.setModel("gpt-3.5-turbo"); // Or another appropriate model
@@ -136,12 +137,15 @@ public class MCPChatBaseService {
         return initResult;
     }
 
-    public Flux<String> processChatMessage(Long chatBaseId, String sessionId,String userId, String userMessage, String userProfileJson) {
+    // Modified processChatMessage method
+    public Flux<String> processChatMessage(Long chatBaseId, UUID sessionId, String externalUserId, String userMessage, String userProfileJson) {
         Optional<MCPChatBase> chatBaseOptional = mcpChatBaseRepository.findById(chatBaseId);
         if (chatBaseOptional.isEmpty()) {
             return Flux.just("Error: ChatBase not found.");
         }
         MCPChatBase chatBase = chatBaseOptional.get();
+
+        ChatSession chatSession = chatSessionService.getOrCreateSession(sessionId,chatBaseId,externalUserId);
 
         AIRequest aiRequest = new AIRequest();
         aiRequest.setPrompt(userMessage);
@@ -162,7 +166,8 @@ public class MCPChatBaseService {
         String systemContent = chatBase.getRolePrompt();
         systemMessage.put("content", systemContent);
         historicalMessages.add(systemMessage);
-        List<MCPChatHistory> chatHistories = mcpChatHistoryService.queryBySessionId(sessionId);
+        // Use MCPChatHistoryService and chatSession.getId()
+        List<ChatHistory> chatHistories = mcpChatHistoryService.queryBySessionId(chatSession.getId());
         for( int i=0;i<chatHistories.size();i++){
             Map<String, Object> userMessageMap = new HashMap<>();
             userMessageMap.put("role", "user");
@@ -205,14 +210,14 @@ public class MCPChatBaseService {
                 }
                 return String.join("", chunks);
             }).subscribe(fullResponse -> {
-                MCPChatHistory chatHistory = new MCPChatHistory();
+                ChatHistory chatHistory = new ChatHistory(); // Changed from ChatHistory
                 chatHistory.setChatBaseId(chatBaseId);
-                chatHistory.setOuterUserId(userId);
+                chatHistory.setOuterUserId(externalUserId); // Using externalUserId
                 chatHistory.setUserMessage(userMessage);
-                chatHistory.setSessionId(sessionId);
+                chatHistory.setChatSessionId(chatSession.getId()); // Set ChatSession
                 String message = serverResponse.toString();
                 chatHistory.setAiResponse(message);
-                mcpChatHistoryService.createChatHistory(chatHistory);
+                mcpChatHistoryService.createChatHistory(chatHistory); // Changed from chatHistoryService
             });
         });
     }
