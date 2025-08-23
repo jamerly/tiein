@@ -1,5 +1,6 @@
 server/.idea
 server/target
+chatbox
 python-sdk
 # Compiled class file
 *.class
