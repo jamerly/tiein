@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Typography, Box, CircularProgress, Grid, Card, CardContent, Switch, FormControlLabel, TextField, Button, Tabs, Tab } from '@mui/material';
-import api from '../services/api';
+import {HttpService} from '../services/api';
 import UserManagementPage from './UserManagementPage';
 
 interface SystemSettingsPageProps {
@@ -17,10 +17,10 @@ const SystemSettingsPage: React.FC<SystemSettingsPageProps> = ({ initialTab = 'g
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const regStatusResponse = await api.get('/admin/settings/registration/status');
-        setIsRegistrationOpen(regStatusResponse.data);
-        const apiKeyResponse = await api.get('/admin/settings/openai/key');
-        setOpenaiApiKey(apiKeyResponse.data);
+        const regStatusResponse = await HttpService.get('/admin/settings/registration/status');
+        setIsRegistrationOpen(regStatusResponse);
+        const apiKeyResponse = await HttpService.get('/admin/settings/openai/key');
+        setOpenaiApiKey(apiKeyResponse || '');
       } catch (err: unknown) {
         setError((err as Error).message || 'Failed to fetch system settings.');
       } finally {
@@ -34,7 +34,7 @@ const SystemSettingsPage: React.FC<SystemSettingsPageProps> = ({ initialTab = 'g
     const newStatus = event.target.checked;
     setIsRegistrationOpen(newStatus);
     try {
-      await api.post('/admin/settings/registration/set', null, { params: { open: newStatus } });
+      await HttpService.post('/admin/settings/registration/set', null, { params: { open: newStatus } });
     } catch (err: unknown) {
       console.error('Update registration status error:', err);
       // Revert UI state if update fails
@@ -46,14 +46,10 @@ const SystemSettingsPage: React.FC<SystemSettingsPageProps> = ({ initialTab = 'g
     try {
       if (openaiApiKey === '') {
         // If the API key is empty, call the DELETE endpoint
-        await api.delete('/admin/settings/openai/key');
+        await HttpService.delete('/admin/settings/openai/key');
       } else {
         // Otherwise, call the POST endpoint to update/set the key
-        await api.post('/admin/settings/openai/key', openaiApiKey, {
-          headers: {
-            'Content-Type': 'text/plain',
-          },
-        });
+        await HttpService.post('/admin/settings/openai/key', { "key" : openaiApiKey});
       }
     } catch (err: any) {
       console.error('Update OpenAI API Key error:', err);

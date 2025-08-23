@@ -86,7 +86,7 @@ public class OpenAIRequestAssembler extends WebClientAIRequestAssembler {
                     StringBuilder resourceContent = new StringBuilder();
                     resourceContent.append("\n\nAvailable Resources:\n");
                     for (ai.jamerly.tiein.entity.MCPResource resource : resources) {
-                        resourceContent.append("--- Resource Name: ").append(resource.getName()).append(" ---\n");
+                        resourceContent.append("--- Resource Uri: ").append(resource.getUri()).append(" ---\n");
                         resourceContent.append(resource.getContent()).append("\n");
                     }
 

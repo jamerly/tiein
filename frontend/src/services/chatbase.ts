@@ -28,7 +28,7 @@ export const createChatBaseInstance = async (payload: CreateChatBasePayload): Pr
 };
 
 export const updateChatBaseInstance = async (id: number, payload: UpdateChatBasePayload): Promise<ChatBaseInstance> => {
-  const response = await HttpService.put<ChatBaseInstance>(`/mcp/chatbases/${id}`, payload);
+  const response = await HttpService.put<ChatBaseInstance>(`/chatbases/${id}`, payload);
   return response;
 };
 

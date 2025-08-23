@@ -1,6 +1,7 @@
 package ai.jamerly.tiein.controller;
 
 import ai.jamerly.tiein.dto.ApiResponse;
+import ai.jamerly.tiein.dto.KeyRequest;
 import ai.jamerly.tiein.service.SystemSettingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -31,8 +32,8 @@ public class SystemSettingController {
     }
 
     @PostMapping("/openai/key")
-    public ResponseEntity<ApiResponse<String>> setOpenAIApiKey(@RequestBody String apiKey) {
-        systemSettingService.setOpenAIApiKey(apiKey);
+    public ResponseEntity<ApiResponse<String>> setOpenAIApiKey(@RequestBody KeyRequest keyRequest) {
+        systemSettingService.setOpenAIApiKey(keyRequest.getKey());
         return ResponseEntity.ok(ApiResponse.success("OpenAI API Key updated successfully."));
     }
 

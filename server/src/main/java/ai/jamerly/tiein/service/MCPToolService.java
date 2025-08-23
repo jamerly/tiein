@@ -321,14 +321,14 @@ public class MCPToolService {
 
     private ToolExecutionResult executeGetResourceContentTool(Map<String, Object> arguments) {
         ToolExecutionResult result = new ToolExecutionResult();
-        if (arguments == null || !arguments.containsKey("resource_name")) {
+        if (arguments == null || !arguments.containsKey("resource_uri")) {
             result.setSuccess(false);
-            result.setErrorMessage("Missing 'resource_name' argument for get_resource_content tool.");
+            result.setErrorMessage("Missing 'resource_uri' argument for get_resource_content tool.");
             return result;
         }
 
         String resourceName = (String) arguments.get("resource_name");
-        Optional<MCPResource> resourceOptional = mcpResourceService.getResourceByName(resourceName);
+        Optional<MCPResource> resourceOptional = mcpResourceService.getResourceByUri(resourceName);
 
         if (resourceOptional.isPresent()) {
             result.setSuccess(true);

@@ -61,9 +61,6 @@ public class MCPResourceService {
         return mcpResourceRepository.findById(id);
     }
 
-    public Optional<MCPResource> getResourceByName(String name) {
-        return mcpResourceRepository.findByName(name);
-    }
 
     public MCPResource createResource(MCPResource resource) {
         // groupIdsJson will be set by the entity's setGroupIds method

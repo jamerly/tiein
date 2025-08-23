@@ -18,15 +18,6 @@ import java.util.UUID;
 public class ChatBaseController {
 
     @Autowired
-    private MCPToolService mcpToolService;
-
-    @Autowired
-    private MCPResourceService mcpResourceService;
-
-    @Autowired
-    private MCPPromptService mcpPromptService;
-
-    @Autowired
     private ChatBaseService chatBaseService;
 
     @Autowired
